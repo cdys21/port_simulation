@@ -27,11 +27,11 @@ BERTH_TRANSITION_TIME_DEFAULT = 60  # minutes
 CONTAINER_TYPES_DEFAULT = {
     "dry": {
         "probability": 0.95,
-        "yard_waiting_time": {"mean": 0, "std": 1.5}  # days
+        "yard_waiting_time": {"mean": 2.47, "std": 1.5}  # days
     },
     "reefer": {
         "probability": 0.05,
-        "yard_waiting_time": {"mean": 0, "std": 0.8}  # days
+        "yard_waiting_time": {"mean": 2.1, "std": 0.8}  # days
     }
 }
 
