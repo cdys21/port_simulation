@@ -7,8 +7,8 @@ import random
 import numpy as np
 
 # Set a fixed seed for reproducibility
-random.seed(21)
-np.random.seed(21)
+random.seed(42)
+np.random.seed(42)
 
 
 from config import (DEFAULT_SHIPS_SCHEDULE, ARRIVAL_TIME_VARIABILITY, MAX_BERTHS_DEFAULT,

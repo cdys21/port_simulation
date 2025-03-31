@@ -213,10 +213,12 @@ def plot_dwell_time_boxplot_components(stats):
 
 def plot_dwell_time_statistics(stats):
     """
-    Display a table of detailed dwell time statistics (in hours) for each component.
+    Display a table of detailed dwell time statistics (in hours) for each component,
+    including total dwell time (sum of all components).
     """
     st.markdown("## Detailed Dwell Time Statistics (Hours)")
     stats_table = {}
+    # Process each individual dwell component.
     for component, values in stats.dwell_components.items():
         if values:
             hours_values = [v / 60 for v in values]
@@ -230,10 +232,36 @@ def plot_dwell_time_statistics(stats):
             }
         else:
             stats_table[component] = {'Mean': 0, 'Median': 0, 'Min': 0, 'Max': 0, 'Std Dev': 0, 'Count': 0}
+    
+    # Compute total dwell time for each observation by summing all components.
+    # Use zip_longest to handle any potential differences in list lengths (fill missing values with 0).
+    from itertools import zip_longest
+    component_values = list(stats.dwell_components.values())
+    if component_values:
+        total_dwell = [sum(values) for values in zip_longest(*component_values, fillvalue=0)]
+    else:
+        total_dwell = []
+    
+    if total_dwell:
+        total_hours = [v / 60 for v in total_dwell]
+        stats_table['total_dwell'] = {
+            'Mean': np.mean(total_hours),
+            'Median': np.median(total_hours),
+            'Min': np.min(total_hours),
+            'Max': np.max(total_hours),
+            'Std Dev': np.std(total_hours),
+            'Count': len(total_hours)
+        }
+    else:
+        stats_table['total_dwell'] = {'Mean': 0, 'Median': 0, 'Min': 0, 'Max': 0, 'Std Dev': 0, 'Count': 0}
+    
+    # Create a DataFrame and adjust index names.
     stats_df = pd.DataFrame(stats_table).T
-    # Adjust the index names if necessary
-    stats_df.index = ['Ship Waiting (Schedule Delay)', 'Berth Queue Time', 'Unloading Process', 
-                      'Yard Storage Time', 'Stacking Retrieval', 'Inland Transport Wait']
+    stats_df.index = [
+        'Ship Waiting (Schedule Delay)', 'Berth Queue Time', 'Unloading Process', 
+        'Yard Storage Time', 'Stacking Retrieval', 'Inland Transport Wait', 
+        'Total Dwell Time'
+    ]
     st.dataframe(stats_df.style.format("{:.2f}"))
 
 def render_train_departures(train_departure_records):
