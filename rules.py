@@ -1,6 +1,5 @@
 # rules.py
 import random
-import math
 
 def determine_stacking_level(yard_level, yard_capacity, max_stacking_height):
     """

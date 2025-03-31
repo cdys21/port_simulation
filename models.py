@@ -1,6 +1,5 @@
 # models.py
 import random
-import math
 import pandas as pd
 
 class Container:
