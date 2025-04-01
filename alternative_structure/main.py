@@ -1,10 +1,11 @@
 import json
-import streamlit as st
-import plotly.express as px
 import random
-random.seed(42)
-
 import simpy
+
+# Helper to load configuration from config.json.
+def load_config(file_path):
+    with open(file_path, 'r') as f:
+        return json.load(f)
 
 # Import our modules.
 from vessel import Vessel
@@ -13,63 +14,61 @@ from unloading import unload_vessel
 from yard import Yard, Container
 from departure import truck_departure_process, train_departure_process
 
-def load_config(file_path):
-    with open(file_path, "r") as f:
-        return json.load(f)
-
-def run_simulation(sim_duration=50):
-    """
-    Run the port logistics simulation for sim_duration hours.
-    Returns a dictionary of collected metrics.
-    """
-    # Initialize metrics dictionary.
-    metrics = {
-        "vessel_arrivals": [],       # List of tuples: (vessel name, actual arrival time)
-        "unloading_durations": [],   # List of tuples: (vessel name, unloading duration)
-        "yard_occupancy": [],        # List of tuples: (simulation time, yard occupancy)
-        "truck_departures": [],      # List of tuples: (time, container_id)
-        "train_departures": []       # List of tuples: (time, container_id)
-    }
+def main():
+    # Set random seed for reproducibility.
+    random.seed(42)
     
     # Create the simulation environment.
     env = simpy.Environment()
     
-    # Load the simulation configuration from the JSON file.
-    config = load_config("/Users/yassineklahlou/Documents/GitHub/port_simulation/alternative_structure/config.json")
-    simulation_config = config["simulation"]
+    # Load configuration from config.json.
+    config = load_config("/Users/yassineklahlou/Documents/GitHub/port_simulation/alternative_structure/config_nynj.json")
+    sim_config = config["simulation"]
     
     # --------------------------
     # Setup Berth Manager.
     # --------------------------
-    num_berths = simulation_config["berths"]
-    cranes_per_berth = simulation_config["cranes_per_berth"]
-    effective_crane_availability = simulation_config["effective_crane_availability"]
+    num_berths = sim_config["berths"]
+    cranes_per_berth = sim_config["cranes_per_berth"]
+    effective_crane_availability = sim_config["effective_crane_availability"]
     berth_manager = BerthManager(env, num_berths, cranes_per_berth, effective_crane_availability)
     
     # --------------------------
-    # Setup Yard.
+    # Setup Yards for Each Container Category.
     # --------------------------
-    # Get yard configuration for category "ANY".
-    yard_config = simulation_config["yard"]["yard_mapping"]["ANY"]
-    yard_capacity = yard_config["capacity"]
-    initial_container_count = yard_config.get("initial_containers", 0)
-    max_stack_height = simulation_config["yard"]["max_stack_height"]
-    retrieval_delay_per_move = 0.1  # in hours
+    container_categories = sim_config["yard"]["container_categories"]
+    yard_mapping = sim_config["yard"]["yard_mapping"]
+    max_stack_height = sim_config["yard"]["max_stack_height"]
+    retrieval_delay_per_move = sim_config["yard"]["retrieval_delay_per_move"]
     
-    yard = Yard(env, yard_capacity, max_stack_height, retrieval_delay_per_move, initial_container_count)
-    metrics["yard_occupancy"].append((env.now, yard.get_occupancy()))
+    # Create a yard instance for each category.
+    yards = {}
+    for category in container_categories:
+        mapping = yard_mapping.get(category, {})
+        capacity = mapping.get("capacity", 40)
+        initial_containers = mapping.get("initial_containers", 0)
+        yards[category] = Yard(env, capacity, max_stack_height, retrieval_delay_per_move, initial_containers)
+        print(f"Yard for category '{category}' created with capacity {capacity} and {initial_containers} pre-existing containers.")
+    
+    # --------------------------
+    # Assign departure mode for pre-existing containers.
+    # --------------------------
+    rail_probability = sim_config["rail_probability"]
+    for category in container_categories:
+        for container in yards[category].containers:
+            container.mode = "Rail" if random.random() < rail_probability else "Road"
     
     # --------------------------
     # Setup Departure Queues and Gate Resource.
     # --------------------------
     truck_queue = []
     train_queue = []
-    gate_resource = simpy.Resource(env, capacity=simulation_config["gate"]["number_of_gates"])
+    gate_resource = simpy.Resource(env, capacity=sim_config["gate"]["number_of_gates"])
     
     # --------------------------
     # Create Vessel Objects.
     # --------------------------
-    arrival_variability = simulation_config["arrival_variability"]
+    arrival_variability = sim_config["arrival_variability"]
     vessels = []
     for vessel_data in config["vessels"]:
         vessel_obj = Vessel(
@@ -81,36 +80,37 @@ def run_simulation(sim_duration=50):
         )
         vessel_obj.adjust_arrival()
         vessels.append(vessel_obj)
-        metrics["vessel_arrivals"].append((vessel_obj.name, vessel_obj.actual_arrival))
+        print(f"Vessel {vessel_obj.name} scheduled to arrive at {vessel_obj.actual_arrival:.2f} hours.")
     
-    # Global counter for container IDs.
-    container_id_counter = initial_container_count
+    # Global container ID counter starts at total pre-existing containers across all yards.
+    container_id_counter = sum(mapping.get("initial_containers", 0) for mapping in yard_mapping.values())
     
     # --------------------------
     # Define Processes.
     # --------------------------
-    def vessel_process(env, vessel, berth_manager, yard):
+    # Get unload_params from configuration.
+    unload_params = sim_config["unload_params"]
+    
+    def vessel_process(env, vessel, berth_manager, yards):
         nonlocal container_id_counter
-        # Wait until vessel actual arrival time.
+        # Wait until vessel's actual arrival.
         yield env.timeout(vessel.actual_arrival)
-        st.write(f"Time {env.now:.2f}: Vessel {vessel.name} arrived with {vessel.container_count} containers.")
+        print(f"Time {env.now:.2f}: Vessel {vessel.name} arrives with {vessel.container_count} containers.")
         
         # Request a berth.
         berth = yield berth_manager.request_berth()
-        st.write(f"Time {env.now:.2f}: Vessel {vessel.name} allocated {berth}.")
+        print(f"Time {env.now:.2f}: Vessel {vessel.name} allocated {berth}.")
         
         # Unload the vessel.
-        unload_params = {"min": 0.03, "mode": 0.04, "max": 0.06}
         unload_duration = yield env.process(unload_vessel(env, vessel, berth, unload_params))
-        metrics["unloading_durations"].append((vessel.name, unload_duration))
-        st.write(f"Time {env.now:.2f}: Vessel {vessel.name} unloaded in {unload_duration:.2f} hours.")
+        print(f"Time {env.now:.2f}: Vessel {vessel.name} unloaded in {unload_duration:.2f} hours.")
         
         # Release the berth.
         yield berth_manager.release_berth(berth)
         
-        # Create yard containers for each container on the vessel.
-        storage_mean = simulation_config["container_storage"]["normal_distribution"]["mean"]
-        storage_stdev = simulation_config["container_storage"]["normal_distribution"]["stdev"]
+        # For each container on the vessel, create a yard container.
+        storage_mean = sim_config["container_storage"]["normal_distribution"]["mean"]
+        storage_stdev = sim_config["container_storage"]["normal_distribution"]["stdev"]
         for i in range(vessel.container_count):
             storage_duration = max(0, random.normalvariate(storage_mean, storage_stdev))
             new_container = Container(
@@ -119,74 +119,72 @@ def run_simulation(sim_duration=50):
                 storage_duration=storage_duration,
                 is_initial=False
             )
-            # Randomly assign departure mode.
-            new_container.mode = random.choice(["Road", "Rail"])
-            yard.add_container(new_container)
+            # Assign container category explicitly from config (e.g. "TEU").
+            new_container.category = container_categories[0]
+            # Assign departure mode based on rail_probability.
+            new_container.mode = "Rail" if random.random() < rail_probability else "Road"
+            # Add the container to its corresponding yard.
+            yards[new_container.category].add_container(new_container)
             container_id_counter += 1
-            # Record yard occupancy update.
-            metrics["yard_occupancy"].append((env.now, yard.get_occupancy()))
+        total_occupancy = sum(yard.get_occupancy() for yard in yards.values())
+        print(f"Time {env.now:.2f}: Total yard occupancy is now {total_occupancy}.")
     
     def yard_to_departure(env, yard, truck_queue, train_queue):
+        """
+        Process for a single yard: retrieves ready containers and sends them to the correct departure queue.
+        """
         while True:
             if yard.get_occupancy() == 0:
                 yield env.timeout(1)
                 continue
             container = yield env.process(yard.retrieve_ready_container())
             if container is not None:
-                mode = getattr(container, "mode", "Road")
-                if mode == "Rail":
+                if container.mode == "Rail":
                     train_queue.append(container)
-                    metrics["train_departures"].append((env.now, container.container_id))
-                    st.write(f"Time {env.now:.2f}: Container {container.container_id} sent to Train queue.")
+                    print(f"Time {env.now:.2f}: Container {container.container_id} (Cat: {container.category}) sent to Train queue.")
                 else:
                     truck_queue.append(container)
-                    metrics["truck_departures"].append((env.now, container.container_id))
-                    st.write(f"Time {env.now:.2f}: Container {container.container_id} sent to Truck queue.")
+                    print(f"Time {env.now:.2f}: Container {container.container_id} (Cat: {container.category}) sent to Truck queue.")
             else:
                 break
+    
+    def termination_process(env, yards, truck_queue, train_queue):
+        """
+        Terminates the simulation when all yards are empty and departure queues are empty.
+        """
+        while True:
+            total_yard = sum(yard.get_occupancy() for yard in yards.values())
+            if total_yard == 0 and not truck_queue and not train_queue:
+                print(f"Time {env.now:.2f}: All containers have left port. Terminating simulation.")
+                env.exit()  # Stop simulation.
+            yield env.timeout(1)
+    
+    def progress_tracker(env, yards):
+        """
+        Periodically prints total containers in all yards to track progress.
+        """
+        while True:
+            total = sum(yard.get_occupancy() for yard in yards.values())
+            print(f"Time {env.now:.2f}: Total containers in yards: {total}")
+            yield env.timeout(1)
     
     # --------------------------
     # Schedule Processes.
     # --------------------------
     for vessel in vessels:
-        env.process(vessel_process(env, vessel, berth_manager, yard))
-    env.process(yard_to_departure(env, yard, truck_queue, train_queue))
-    env.process(truck_departure_process(env, truck_queue, gate_resource, simulation_config["gate"]["truck_processing_time"]))
-    env.process(train_departure_process(env, train_queue, simulation_config["trains_per_day"]))
+        env.process(vessel_process(env, vessel, berth_manager, yards))
+    for yard_instance in yards.values():
+        env.process(yard_to_departure(env, yard_instance, truck_queue, train_queue))
+    env.process(truck_departure_process(env, truck_queue, gate_resource, sim_config["gate"]["truck_processing_time"]))
+    env.process(train_departure_process(env, train_queue, sim_config["trains_per_day"]))
+    env.process(termination_process(env, yards, truck_queue, train_queue))
+    env.process(progress_tracker(env, yards))
     
-    # Run simulation for the specified duration.
-    env.run(until=sim_duration)
+    # --------------------------
+    # Run the Simulation.
+    # --------------------------
+    # Simulation runs until termination_process calls env.exit().
+    env.run()
     
-    return metrics
-
-# --------------------------
-# Streamlit UI.
-# --------------------------
-st.title("Port Logistics Simulation")
-
-# Sidebar inputs.
-sim_duration = st.sidebar.number_input("Simulation Duration (hours)", min_value=1, max_value=200, value=50, step=1)
-
-if st.sidebar.button("Run Simulation"):
-    with st.spinner("Running simulation..."):
-        metrics = run_simulation(sim_duration)
-        st.success("Simulation completed!")
-        
-        # Display metrics.
-        st.subheader("Vessel Arrivals (Vessel Name, Actual Arrival Time)")
-        st.write(metrics["vessel_arrivals"])
-        
-        st.subheader("Unloading Durations (Vessel Name, Duration)")
-        st.write(metrics["unloading_durations"])
-        
-        st.subheader("Yard Occupancy Over Time")
-        times = [t for t, occ in metrics["yard_occupancy"]]
-        occupancies = [occ for t, occ in metrics["yard_occupancy"]]
-        fig_occ = px.line(x=times, y=occupancies, labels={'x': 'Time (hours)', 'y': 'Occupancy'})
-        st.plotly_chart(fig_occ)
-        
-        st.subheader("Truck Departures (Time, Container ID)")
-        st.write(metrics["truck_departures"])
-        
-        st.subheader("Train Departures (Time, Container ID)")
-        st.write(metrics["train_departures"])
+if __name__ == '__main__':
+    main()
