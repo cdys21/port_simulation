@@ -68,7 +68,7 @@ class Yard:
             raise Exception("Yard is full. Cannot add more containers.")
         container.stacking_level = len(self.containers) // self.per_level
         self.containers.append(container)
-        print(f"Time {self.env.now}: Added {container}")
+        #print(f"Time {self.env.now}: Added {container}")
 
     def get_occupancy(self):
         """

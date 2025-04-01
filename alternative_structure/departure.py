@@ -17,18 +17,14 @@ def truck_departure_process(env, truck_queue, gate_resource, truck_processing_pa
         and remove the two containers from the queue.
     """
     while True:
-        # If less than 2 containers, wait a short time.
-        if len(truck_queue) < 2:
+        if len(truck_queue) == 0:
             yield env.timeout(0.1)
             continue
-        # Request a gate for processing a truck.
         with gate_resource.request() as req:
             yield req
-            # Pop 2 containers (if available).
-            if len(truck_queue) >= 2:
-                containers = [truck_queue.pop(0) for _ in range(2)]
-            else:
-                containers = [truck_queue.pop(0)]
+            # Process as many containers as available, up to 2.
+            num_to_process = min(2, len(truck_queue))
+            containers = [truck_queue.pop(0) for _ in range(num_to_process)]
             # Sample processing time (in minutes) and convert to hours.
             processing_time_minutes = random.triangular(
                 truck_processing_params["min"],
@@ -36,19 +32,12 @@ def truck_departure_process(env, truck_queue, gate_resource, truck_processing_pa
                 truck_processing_params["mode"]
             )
             processing_time = processing_time_minutes / 60.0
-            print(f"Time {env.now:.2f}: Truck departing with containers {[c.container_id for c in containers]}, processing time: {processing_time:.2f} hours")
+            #print(f"Time {env.now:.2f}: Truck departing with containers {[c.container_id for c in containers]}, processing time: {processing_time:.2f} hours")
             yield env.timeout(processing_time)
 
-def train_departure_process(env, train_queue, trains_per_day):
+def train_departure_process(env, train_queue, trains_per_day, train_capacity):
     """
-    Process train departures.
-    
-    - train_queue: list of containers (with mode "Rail") waiting for train departure.
-    - trains_per_day: number of trains scheduled per day.
-    
-    Process:
-      - Calculate fixed departure interval based on a 24-hour day.
-      - At each departure time, load all available train containers (simulate loading instantly for simplicity).
+    Continuously schedules train departures at fixed intervals and processes up to train_capacity containers per departure.
     """
     departure_interval = 24 / trains_per_day  # hours between departures
     next_departure = env.now  # first departure at current simulation time
@@ -56,45 +45,11 @@ def train_departure_process(env, train_queue, trains_per_day):
         # Wait until the next scheduled train departure.
         yield env.timeout(max(0, next_departure - env.now))
         if train_queue:
-            departing_ids = [c.container_id for c in train_queue]
-            print(f"Time {env.now:.2f}: Train departing with containers {departing_ids}")
-            # Clear the train queue after departure.
-            train_queue.clear()
+            num_to_process = min(train_capacity, len(train_queue))
+            departing_containers = [train_queue.pop(0) for _ in range(num_to_process)]
+            departing_ids = [c.container_id for c in departing_containers]
+            #print(f"Time {env.now:.2f}: Train departing with containers {departing_ids}")
         else:
-            print(f"Time {env.now:.2f}: Train departing with no containers")
+            #print(f"Time {env.now:.2f}: Train departing with no containers")
+            pass
         next_departure += departure_interval
-
-## Dummy container class for testing.
-#class DummyContainer:
-#    def __init__(self, container_id, mode):
-#        self.container_id = container_id
-#        self.mode = mode
-#
-#    def __str__(self):
-#        return f"Container(id={self.container_id}, mode={self.mode})"
-#
-#if __name__ == '__main__':
-#    # Set seed for reproducibility.
-#    random.seed(42)
-#
-#    # Create a SimPy environment.
-#    env = simpy.Environment()
-#
-#    # Configuration for truck departures from JSON.
-#    truck_processing_params = {"min": 10, "mode": 13, "max": 30}  # in minutes
-#    number_of_gates = 125
-#    # Create a SimPy resource for gates.
-#    gate_resource = simpy.Resource(env, capacity=number_of_gates)
-#
-#    # For testing, create dummy queues for truck and train containers.
-#    # Let's assume 6 truck containers (mode "Road") and 5 train containers (mode "Rail").
-#    truck_queue = [DummyContainer(i, "Road") for i in range(6)]
-#    train_queue = [DummyContainer(i+100, "Rail") for i in range(5)]
-#
-#    # Start the truck departure process.
-#    env.process(truck_departure_process(env, truck_queue, gate_resource, truck_processing_params))
-#    # Start the train departure process with 4 trains per day (i.e. every 6 hours).
-#    env.process(train_departure_process(env, train_queue, trains_per_day=4))
-#
-#    # For testing, let the simulation run for a set duration.
-#    env.run(until=30)

@@ -67,13 +67,13 @@ if __name__ == '__main__':
     berth_manager = BerthManager(env, num_berths, cranes_per_berth, effective_crane_availability)
     
     def vessel_process(env, berth_manager, vessel_name):
-        print(f"Time {env.now}: {vessel_name} requesting berth")
+        #print(f"Time {env.now}: {vessel_name} requesting berth")
         # Request a berth.
         berth = yield berth_manager.request_berth()
-        print(f"Time {env.now}: {vessel_name} allocated {berth}")
+        #print(f"Time {env.now}: {vessel_name} allocated {berth}")
         # Simulate occupying the berth for 5 time units.
         yield env.timeout(5)
-        print(f"Time {env.now}: {vessel_name} releasing {berth}")
+        #print(f"Time {env.now}: {vessel_name} releasing {berth}")
         # Release the berth back to the pool.
         yield berth_manager.release_berth(berth)
     
