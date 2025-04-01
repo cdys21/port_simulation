@@ -18,7 +18,7 @@
     },
     "trains_per_day": 4,
     "train": {
-      "capacity": 200
+      "capacity": 500
     },
     "arrival_variability": {
       "min": -1,
