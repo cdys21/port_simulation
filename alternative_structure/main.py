@@ -1,8 +1,10 @@
 import json
 import random
 random.seed(42)
+
 import simpy
 import sys
+import statistics
 
 # Helper to load configuration from config.json.
 def load_config(file_path):
@@ -21,18 +23,11 @@ from metrics import Metrics
 class Termination(Exception):
     pass
 
-def main():
-    # Set random seed for reproducibility.
+def main(progress_callback=None):
     random.seed(42)
-    
-    # Create the simulation environment.
     env = simpy.Environment()
-    
-    # Load configuration from config.json.
-    config = load_config("/Users/yassineklahlou/Documents/GitHub/port_simulation/alternative_structure/config_nynj.json")
+    config = load_config("config.json")
     sim_config = config["simulation"]
-    
-    # Create a metrics instance.
     metrics = Metrics()
     
     # --------------------------
@@ -51,15 +46,13 @@ def main():
     max_stack_height = sim_config["yard"]["max_stack_height"]
     retrieval_delay_per_move = sim_config["yard"]["retrieval_delay_per_move"]
     
-    # Create a yard instance for each category.
     yards = {}
     for category in container_categories:
         mapping = yard_mapping.get(category, {})
         capacity = mapping.get("capacity", 40)
         initial_containers = mapping.get("initial_containers", 0)
         yards[category] = Yard(env, capacity, max_stack_height, retrieval_delay_per_move, initial_containers)
-        #print(f"Yard for category '{category}' created with capacity {capacity} and {initial_containers} pre-existing containers.")
-    # Record initial yard occupancy.
+        print(f"Yard for category '{category}' created with capacity {capacity} and {initial_containers} pre-existing containers.")
     total_initial = sum(yard.get_occupancy() for yard in yards.values())
     metrics.record_yard_occupancy(0, total_initial)
     
@@ -93,25 +86,28 @@ def main():
         )
         vessel_obj.adjust_arrival()
         vessels.append(vessel_obj)
-        #print(f"Vessel {vessel_obj.name} scheduled to arrive at {vessel_obj.actual_arrival:.2f} hours.")
+        print(f"Vessel {vessel_obj.name} scheduled to arrive at {vessel_obj.actual_arrival:.2f} hours.")
         metrics.record_vessel_arrival(vessel_obj.name, vessel_obj.scheduled_arrival, vessel_obj.actual_arrival)
+        # Record ship waiting (actual - scheduled) per container.
+        ship_wait = vessel_obj.actual_arrival - vessel_obj.scheduled_arrival
+        for _ in range(vessel_obj.container_count):
+            metrics.record_ship_waiting(ship_wait)
     
-    # Global container ID counter starts at total pre-existing containers across all yards.
+    # Global container ID counter.
     container_id_counter = sum(mapping.get("initial_containers", 0) for mapping in yard_mapping.values())
-    
-    # --------------------------
-    # Define Processes.
-    # --------------------------
-    unload_params = sim_config["unload_params"]
     
     def vessel_process(env, vessel, berth_manager, yards):
         nonlocal container_id_counter
         yield env.timeout(vessel.actual_arrival)
-        #print(f"Time {env.now:.2f}: Vessel {vessel.name} arrives with {vessel.container_count} containers.")
+        print(f"Time {env.now:.2f}: Vessel {vessel.name} arrives with {vessel.container_count} containers.")
+        request_time = env.now
         berth = yield berth_manager.request_berth()
-        #print(f"Time {env.now:.2f}: Vessel {vessel.name} allocated {berth}.")
-        unload_duration = yield env.process(unload_vessel(env, vessel, berth, unload_params))
-        #print(f"Time {env.now:.2f}: Vessel {vessel.name} unloaded in {unload_duration:.2f} hours.")
+        berth_alloc_time = env.now
+        berth_wait = berth_alloc_time - vessel.actual_arrival
+        metrics.record_berth_wait(berth_wait)
+        print(f"Time {env.now:.2f}: Vessel {vessel.name} allocated {berth} after waiting {berth_wait:.2f}h.")
+        unload_duration = yield env.process(unload_vessel(env, vessel, berth, sim_config["unload_params"]))
+        print(f"Time {env.now:.2f}: Vessel {vessel.name} unloaded in {unload_duration:.2f} hours.")
         metrics.record_unloading_duration(vessel.name, unload_duration)
         yield berth_manager.release_berth(berth)
         storage_mean = sim_config["container_storage"]["normal_distribution"]["mean"]
@@ -124,12 +120,13 @@ def main():
                 storage_duration=storage_duration,
                 is_initial=False
             )
+            new_container.vessel_expected_arrival = vessel.scheduled_arrival
             new_container.category = container_categories[0]  # e.g., "TEU"
             new_container.mode = "Rail" if random.random() < rail_probability else "Road"
             yards[new_container.category].add_container(new_container)
             container_id_counter += 1
         total_occ = sum(yard.get_occupancy() for yard in yards.values())
-        #print(f"Time {env.now:.2f}: Total yard occupancy is now {total_occ}.")
+        print(f"Time {env.now:.2f}: Total yard occupancy is now {total_occ}.")
         metrics.record_yard_occupancy(env.now, total_occ)
     
     def yard_to_departure(env, yard, truck_queue, train_queue):
@@ -139,14 +136,24 @@ def main():
                 continue
             container = yield env.process(yard.retrieve_ready_container())
             if container is not None:
+                # Record yard storage time.
+                yard_storage = env.now - container.arrival_time
+                metrics.record_yard_storage(yard_storage)
+                # Record stacking retrieval time.
+                stacking_retrieval = (max_stack_height - 1 - container.stacking_level) * retrieval_delay_per_move
+                metrics.record_stacking_retrieval(stacking_retrieval)
+                # Mark retrieval time.
+                container.retrieval_time = env.now
+                # Use explicit parentheses to ensure correct evaluation.
+                dwell_time = (env.now - container.vessel_expected_arrival) if hasattr(container, 'vessel_expected_arrival') else None
                 if container.mode == "Rail":
                     train_queue.append(container)
-                    #print(f"Time {env.now:.2f}: Container {container.container_id} (Cat: {container.category}) sent to Train queue.")
-                    metrics.record_container_departure(container.container_id, container.mode, env.now)
+                    print(f"Time {env.now:.2f}: Container {container.container_id} (Cat: {container.category}) sent to Train queue.")
+                    metrics.record_container_departure(container.container_id, container.mode, env.now, dwell_time)
                 else:
                     truck_queue.append(container)
-                    #print(f"Time {env.now:.2f}: Container {container.container_id} (Cat: {container.category}) sent to Truck queue.")
-                    metrics.record_container_departure(container.container_id, container.mode, env.now)
+                    print(f"Time {env.now:.2f}: Container {container.container_id} (Cat: {container.category}) sent to Truck queue.")
+                    metrics.record_container_departure(container.container_id, container.mode, env.now, dwell_time)
             else:
                 break
     
@@ -155,32 +162,35 @@ def main():
             total_yard = sum(yard.get_occupancy() for yard in yards.values())
             tq = len(truck_queue)
             trq = len(train_queue)
-            #print(f"Termination check at time {env.now:.2f}: yards={total_yard}, truck_queue={tq}, train_queue={trq}")
+            print(f"Termination check at time {env.now:.2f}: yards={total_yard}, truck_queue={tq}, train_queue={trq}")
             if total_yard == 0 and tq == 0 and trq == 0:
-                #print(f"Time {env.now:.2f}: All containers have left port. Terminating simulation.")
+                print(f"Time {env.now:.2f}: All containers have left port. Terminating simulation.")
                 raise Termination
             yield env.timeout(1)
     
     def progress_tracker(env, yards, truck_queue, train_queue):
         bar_length = 50
+        total_capacity = sum(yard.capacity for yard in yards.values())
         while True:
             total = sum(yard.get_occupancy() for yard in yards.values())
-            total_capacity = sum(yard.capacity for yard in yards.values())
-            ratio = total / total_capacity if total_capacity > 0 else 0
-            filled_length = int(round(bar_length * ratio))
-            bar = "[" + "#" * filled_length + "-" * (bar_length - filled_length) + "]"
             tq = len(truck_queue)
             trq = len(train_queue)
-            print(f"Time {env.now:.2f}: Yard {bar} {total}/{total_capacity} containers")
+            filled_length = int(round(bar_length * (total / total_capacity)))
+            bar = "[" + "#" * filled_length + "-" * (bar_length - filled_length) + "]"
+            print(f"Time {env.now:.2f}: Yard {bar} {total}/{total_capacity} containers, truck_queue: {tq}, train_queue: {trq}")
             metrics.record_yard_occupancy(env.now, total)
+            metrics.record_truck_queue(env.now, tq)
+            metrics.record_train_queue(env.now, trq)
+            if progress_callback:
+                progress_callback(total, total_capacity, tq, trq, env.now)
             yield env.timeout(1)
     
     for vessel in vessels:
         env.process(vessel_process(env, vessel, berth_manager, yards))
     for yard_instance in yards.values():
         env.process(yard_to_departure(env, yard_instance, truck_queue, train_queue))
-    env.process(truck_departure_process(env, truck_queue, gate_resource, sim_config["gate"]["truck_processing_time"]))
-    env.process(train_departure_process(env, train_queue, sim_config["trains_per_day"], sim_config["train"]["capacity"]))
+    env.process(truck_departure_process(env, truck_queue, gate_resource, sim_config["gate"]["truck_processing_time"], metrics))
+    env.process(train_departure_process(env, train_queue, sim_config["trains_per_day"], sim_config["train"]["capacity"], metrics))
     env.process(termination_process(env, yards, truck_queue, train_queue))
     env.process(progress_tracker(env, yards, truck_queue, train_queue))
     
@@ -189,7 +199,6 @@ def main():
     except Termination:
         print("Simulation terminated successfully.")
     
-    metrics.summary()
     return metrics
 
 if __name__ == '__main__':
