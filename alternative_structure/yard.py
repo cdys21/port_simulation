@@ -4,35 +4,7 @@ import random
 random.seed(42)
 
 import simpy
-
-class Container:
-    """
-    Represents a container stored in the yard.
-    
-    Attributes:
-        container_id (int): Unique identifier.
-        category (str): Container category (default "ANY").
-        arrival_time (float): Time when container arrived in the yard.
-        storage_duration (float): Planned waiting period in the yard.
-        stacking_level (int): The stacking level assigned in the yard.
-        is_initial (bool): True if the container was present at simulation start.
-        mode (str): Departure mode ("Rail" or "Road"). Default is None.
-    """
-    def __init__(self, container_id, category="ANY", arrival_time=0.0, storage_duration=0.0, is_initial=False):
-        self.container_id = container_id
-        self.category = category
-        self.arrival_time = arrival_time
-        self.storage_duration = storage_duration
-        self.stacking_level = None  # Assigned when added to the yard
-        self.is_initial = is_initial
-        self.mode = None  # New attribute for departure mode
-
-    def __str__(self):
-        init_str = "Initial" if self.is_initial else "Arrived"
-        return (f"Container(id={self.container_id}, category={self.category}, "
-                f"{init_str}, arrival_time={self.arrival_time}, storage_duration={self.storage_duration:.2f}, "
-                f"stacking_level={self.stacking_level}, mode={self.mode})")
-
+from container import Container
 
 class Yard:
     """

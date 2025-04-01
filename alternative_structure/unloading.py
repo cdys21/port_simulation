@@ -41,9 +41,8 @@ def unload_vessel(env, vessel, berth, unload_time_params):
     for key in results:
         finish_times.extend(results[key])
     finish_times.sort()
-    # Return a list of unloading durations for each container.
-    container_unload_durations = [ft - start_time for ft in finish_times]
-    return container_unload_durations
+    # Return the list of actual finish times (each container’s yard arrival time)
+    return finish_times
 
 ## Testing the unloading module.
 #if __name__ == '__main__':

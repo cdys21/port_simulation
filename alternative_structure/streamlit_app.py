@@ -86,3 +86,16 @@ if st.sidebar.button("Run Simulation"):
     df_summary = pd.DataFrame(summary_rows)
     st.subheader("Duration Metrics Summary")
     st.dataframe(df_summary)
+
+    # Summarize departures by truck and rail for non-initial containers
+    total_initial = metrics.total_initial if hasattr(metrics, 'total_initial') else 0
+    truck_departures = len([c for c in metrics.container_departures if c[1] == "Road" and c[0] >= total_initial])
+    rail_departures = len([c for c in metrics.container_departures if c[1] == "Rail" and c[0] >= total_initial])
+
+    departure_summary = pd.DataFrame({
+        "Mode": ["Truck (Road)", "Train (Rail)"],
+        "Number of Containers": [truck_departures, rail_departures]
+    })
+
+    st.subheader("Total Departures by Mode (Non-Initial Containers)")
+    st.table(departure_summary)

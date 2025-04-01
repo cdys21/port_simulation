@@ -1,20 +1,23 @@
 # main.py
 
-import json
 import random
+random.seed(42)
+
 import simpy
 import sys
 import statistics
 
-# Helper to load configuration from config.json.
+import commentjson as json  # Use commentjson instead of the standard json module
+
 def load_config(file_path):
     with open(file_path, 'r') as f:
         return json.load(f)
-
+    
 from vessel import Vessel
 from berth import BerthManager
 from unloading import unload_vessel
-from yard import Yard, Container
+from yard import Yard
+from container import Container
 from departure import truck_departure_process, train_departure_process
 from metrics import Metrics
 
@@ -24,7 +27,7 @@ class Termination(Exception):
 def main(progress_callback=None):
     random.seed(42)
     env = simpy.Environment()
-    config = load_config("/Users/yassineklahlou/Documents/GitHub/port_simulation/alternative_structure/config_nynj.json")
+    config = load_config("/Users/yassineklahlou/Documents/GitHub/port_simulation/alternative_structure/config.jsonc")
     sim_config = config["simulation"]
     metrics = Metrics()
     
@@ -48,12 +51,13 @@ def main(progress_callback=None):
         #print(f"Yard for category '{category}' created with capacity {capacity} and {initial_containers} pre-existing containers.")
     total_initial = sum(yard.get_occupancy() for yard in yards.values())
     metrics.record_yard_occupancy(0, total_initial)
+    metrics.total_initial = total_initial  # then access via metrics.total_initial in streamlit
     
     # Assign departure mode for pre-existing containers.
-    rail_probability = sim_config["rail_probability"]
+    train_percentage = sim_config["train"]["percentage"]
     for category in container_categories:
         for container in yards[category].containers:
-            container.mode = "Rail" if random.random() < rail_probability else "Road"
+            container.mode = "Rail" if random.random() < train_percentage else "Road"
     
     # Setup Departure Queues and Gate Resource.
     truck_queue = []
@@ -94,31 +98,41 @@ def main(progress_callback=None):
         #print(f"Time {env.now:.2f}: Vessel {vessel.name} unloaded in {vessel_unload_duration:.2f} hours.")
         metrics.record_unloading_duration(vessel.name, vessel_unload_duration)
         yield berth_manager.release_berth(berth)
-        storage_mean = sim_config["container_storage"]["normal_distribution"]["mean"]
-        storage_stdev = sim_config["container_storage"]["normal_distribution"]["stdev"]
-        # Create a container for each vessel container using the individual unload finish times.
+        
+        # Read triangular parameters from the config.
+        cs = sim_config["container_storage"]["triangular_distribution"]
+        # Assume unload_vessel now returns a list of unload finish times for each container.
         for i in range(vessel.container_count):
-            storage_duration = max(0, random.normalvariate(storage_mean, storage_stdev))
+            storage_duration = random.triangular(
+                sim_config["container_storage"]["triangular_distribution"]["min"],
+                sim_config["container_storage"]["triangular_distribution"]["max"],
+                sim_config["container_storage"]["triangular_distribution"]["mode"]
+            )
             
-            # Correctly set arrival_time at the yard individually for each container
-            container_yard_arrival = unload_finish_times[i]  # each container's exact arrival time at the yard
-
+            # Use the individual finish time as the yard arrival time.
+            container_yard_arrival = unload_finish_times[i]
+            
             new_container = Container(
                 container_id=container_id_counter,
-                arrival_time=container_yard_arrival,
                 storage_duration=storage_duration,
                 is_initial=False
             )
-
-            # Correct individual container unloading time
-            new_container.unloading_time = container_yard_arrival - berth_alloc_time
-
-            # Other attributes as before
-            new_container.vessel_expected_arrival = vessel.scheduled_arrival
-            new_container.category = container_categories[0]
-            new_container.mode = "Rail" if random.random() < rail_probability else "Road"
-
-            # Add container to yard
+            
+            # Set checkpoints:
+            new_container.checkpoints["vessel_expected_arrival"] = vessel.scheduled_arrival
+            new_container.checkpoints["unload_finish"] = container_yard_arrival
+            new_container.checkpoints["berth_allocation"] = berth_alloc_time  # Recorded earlier in vessel_process
+            
+            # The container’s yard arrival time is the same as unload_finish.
+            # (Optionally, you could duplicate it as "yard_arrival" if you prefer.)
+            
+            new_container.category = container_categories[0]  # e.g., "TEU"
+            
+            # Use the train percentage from config.
+            train_percentage = sim_config["train"]["percentage"]
+            new_container.mode = "Rail" if random.random() < train_percentage else "Road"
+            
+            # Add container to the appropriate yard.
             yards[new_container.category].add_container(new_container)
             container_id_counter += 1
 
@@ -134,20 +148,22 @@ def main(progress_callback=None):
                 continue
             container = yield env.process(yard.retrieve_ready_container())
             if container is not None:
-                yard_storage = env.now - container.arrival_time
+                # Record retrieval time.
+                container.checkpoints["yard_retrieval"] = env.now
+                yard_storage = container.checkpoints["yard_retrieval"] - container.checkpoints["unload_finish"]
                 metrics.record_yard_storage(yard_storage)
                 stacking_retrieval = (max_stack_height - 1 - container.stacking_level) * retrieval_delay_per_move
                 metrics.record_stacking_retrieval(stacking_retrieval)
-                container.retrieval_time = env.now
-                dwell_time = (env.now - container.vessel_expected_arrival) if hasattr(container, 'vessel_expected_arrival') else None
+                # For dwell time, you might compute as departure time - vessel_expected_arrival,
+                # but here we'll record the retrieval time and later compute departure times in the departure processes.
                 if container.mode == "Rail":
                     train_queue.append(container)
-                    #print(f"Time {env.now:.2f}: Container {container.container_id} sent to Train queue.")
-                    metrics.record_container_departure(container.container_id, container.mode, env.now, dwell_time)
+                    metrics.record_container_departure(container.container_id, container.mode, env.now,
+                        env.now - container.checkpoints["vessel_expected_arrival"])
                 else:
                     truck_queue.append(container)
-                    #print(f"Time {env.now:.2f}: Container {container.container_id} sent to Truck queue.")
-                    metrics.record_container_departure(container.container_id, container.mode, env.now, dwell_time)
+                    metrics.record_container_departure(container.container_id, container.mode, env.now,
+                        env.now - container.checkpoints["vessel_expected_arrival"])
             else:
                 break
     
