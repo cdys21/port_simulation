@@ -9,7 +9,7 @@
         "start": "06:00", // gate operating start time (local)
         "end": "17:00"    // gate operating end time (local)
       },
-      "number_of_gates": 125, // total number of gates
+      "number_of_gates": 15, // total number of gates
       "truck_processing_time": {
         "min": 0.1,   // minimum truck processing time (hours)
         "mode": 0.13,  // most likely truck processing time (hours)
@@ -18,7 +18,7 @@
     },
     "trains_per_day": 6, // number of trains departing per day
     "train": {
-      "capacity": 500, // maximum number of containers per train
+      "capacity": 50, // maximum number of containers per train
       "percentage": 0.15 // fraction of containers (50%) assigned to train (i.e. rail percentage)
     },
     "arrival_variability": {
@@ -53,7 +53,7 @@
   "vessels": [
     {
       "name": "CEZANNE",
-      "containers": 26, // container count
+      "containers": 1000, // container count
       "expected_arrival_day": 1, // day of scheduled arrival (starting at 1)
       "expected_arrival": 8 // hour of scheduled arrival (24-hour clock)
     },

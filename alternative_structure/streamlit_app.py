@@ -1,5 +1,3 @@
-# streamlit_app.py
-
 import streamlit as st
 import plotly.express as px
 import pandas as pd
@@ -11,93 +9,80 @@ st.sidebar.header("Simulation Controls")
 progress_bar = st.sidebar.progress(0)
 progress_text = st.sidebar.empty()
 
-def progress_callback(current, total_capacity, tq, trq, current_time):
-    ratio = current / total_capacity if total_capacity > 0 else 0
+def progress_callback(total, total_capacity, truck_q, train_q, current_time):
+    ratio = total / total_capacity if total_capacity > 0 else 0
     progress_bar.progress(int(ratio * 100))
-    progress_text.text(f"Time {current_time:.2f}h: Yard occupancy {current}/{total_capacity}, Truck queue: {tq}, Train queue: {trq}")
+    progress_text.text(f"Time {current_time:.2f}h: Yard occupancy {total}/{total_capacity}, Truck queue: {truck_q}, Train queue: {train_q}")
 
 if st.sidebar.button("Run Simulation"):
     st.write("Running simulation, please wait...")
     metrics = main(progress_callback=progress_callback)
     st.success("Simulation completed!")
     
-    # Filter non-initial container departures.
-    non_initial_departures = [record for record in metrics.container_departures if record[0] >= metrics.total_initial]
+    # Create container DataFrame, filter non-initial containers.
+    if metrics.container_records:
+        df_containers = pd.DataFrame(metrics.container_records)
+        # Compute total_dwell_time = departed_port - entered_yard if both exist.
+        if "departed_port" in df_containers.columns and "entered_yard" in df_containers.columns:
+            df_containers["total_dwell_time"] = df_containers.apply(
+                lambda row: row["departed_port"] - row["entered_yard"]
+                if pd.notnull(row["departed_port"]) and pd.notnull(row["entered_yard"])
+                else None, axis=1)
+        
+        # Filter out initial containers.
+        df_non_initial = df_containers[df_containers["is_initial"] == False]
+        st.subheader("Container Records (Non-Initial)")
+        
+        # List of derived duration columns to plot distributions.
+        duration_cols = [
+            "vessel_delays",
+            "berth_delays",
+            "unloading_time",
+            "yard_time",
+            "retrieval_time",
+            "queuing_for_tsp",
+            "loading_time",
+            "total_dwell_time"
+        ]
 
-    # Plot Yard Occupancy Over Time.
-    if metrics.yard_occupancy:
-        times = [t for t, occ in metrics.yard_occupancy]
-        occ = [occ for t, occ in metrics.yard_occupancy]
-        fig1 = px.line(x=times, y=occ, labels={'x': 'Time (hours)', 'y': 'Yard Occupancy'},
-                       title="Yard Occupancy Over Time")
-        st.plotly_chart(fig1)
+        st.dataframe(df_non_initial[["container_id", "mode", "vessel", "total_dwell_time", "yard_time", "retrieval_time"]])
+        
+        # Select only the duration columns and melt the DataFrame into long format.
+        df_durations = df_non_initial[duration_cols].melt(var_name="Duration", value_name="Hours")
+        # Remove any rows with NaN values.
+        df_durations = df_durations.dropna()
+
+        if not df_durations.empty:
+            fig_box = px.box(
+                df_durations,
+                x="Duration",
+                y="Hours",
+                title="Derived Duration Distributions",
+                labels={"Duration": "Duration Type", "Hours": "Duration (hours)"}
+            )
+            st.plotly_chart(fig_box)
+
     
-    # Distribution of Container Dwell Times (only non-initial containers).
-    dwell_times = [dwell for cid, mode, t, dwell in non_initial_departures if dwell is not None]
-    if dwell_times:
-        fig2 = px.histogram(x=dwell_times, nbins=50, labels={'x': 'Container Dwell Time (hours)'}, 
-                            title="Distribution of Container Dwell Times (Non-Initial)")
-        st.plotly_chart(fig2)
+    # Plot Yard Utilization Over Time.
+    if metrics.yard_utilization:
+        df_yard = pd.DataFrame(metrics.yard_utilization, columns=["Time", "Yard", "Occupancy"])
+        fig_yard = px.line(df_yard, x="Time", y="Occupancy", color="Yard",
+                           title="Yard Utilization Over Time",
+                           labels={"Time": "Time (hours)", "Occupancy": "Number of Containers"})
+        st.plotly_chart(fig_yard)
     
-    # Truck Queue Length Over Time.
+    # Plot Truck Queue Length Over Time.
     if metrics.truck_queue_lengths:
-        tq_times = [t for t, length in metrics.truck_queue_lengths]
-        tq_lengths = [length for t, length in metrics.truck_queue_lengths]
-        fig3 = px.line(x=tq_times, y=tq_lengths, labels={'x': 'Time (hours)', 'y': 'Truck Queue Length'}, 
-                       title="Truck Queue Length Over Time")
-        st.plotly_chart(fig3)
+        df_truck = pd.DataFrame(metrics.truck_queue_lengths, columns=["Time", "Truck_Queue_Length"])
+        fig_truck = px.line(df_truck, x="Time", y="Truck_Queue_Length",
+                            title="Truck Queue Length Over Time",
+                            labels={"Time": "Time (hours)", "Truck_Queue_Length": "Truck Queue Length"})
+        st.plotly_chart(fig_truck)
     
-    # Train Queue Length Over Time.
+    # Plot Train Queue Length Over Time.
     if metrics.train_queue_lengths:
-        trq_times = [t for t, length in metrics.train_queue_lengths]
-        trq_lengths = [length for t, length in metrics.train_queue_lengths]
-        fig4 = px.line(x=trq_times, y=trq_lengths, labels={'x': 'Time (hours)', 'y': 'Train Queue Length'}, 
-                       title="Train Queue Length Over Time")
-        st.plotly_chart(fig4)
-    
-    # Create summary table for duration metrics (non-initial containers only).
-    def summarize(metric_list):
-        if not metric_list:
-            return {"n": 0, "mean": None, "median": None, "min": None, "max": None}
-        return {
-            "n": len(metric_list),
-            "mean": round(sum(metric_list) / len(metric_list), 2),
-            "median": round(pd.Series(metric_list).median(), 2),
-            "min": round(min(metric_list), 2),
-            "max": round(max(metric_list), 2)
-        }
-    
-    summary_data = {
-        "Ship Waiting": summarize([v for v in metrics.ship_waiting_times]),
-        "Berth Queue": summarize([v for v in metrics.berth_waiting_times]),
-        "Unloading": summarize([v for v in metrics.unloading_durations]),
-        "Yard Storage": summarize([v for v in metrics.yard_storage_times]),
-        "Stacking Retrieval": summarize([v for v in metrics.stacking_retrieval_times]),
-        "Inland Transport": summarize([v for v in metrics.inland_transport_wait_times])
-    }
-    
-    summary_rows = []
-    for metric, stats in summary_data.items():
-        summary_rows.append({
-            "Metric": metric,
-            "n": stats["n"],
-            "Mean": stats["mean"],
-            "Median": stats["median"],
-            "Min": stats["min"],
-            "Max": stats["max"]
-        })
-    df_summary = pd.DataFrame(summary_rows)
-    st.subheader("Duration Metrics Summary (All Containers)")
-    st.dataframe(df_summary)
-    
-    # Create a summary table for departures by mode for non-initial containers.
-    truck_departures = len([record for record in non_initial_departures if record[1] == "Road"])
-    rail_departures = len([record for record in non_initial_departures if record[1] == "Rail"])
-    
-    departure_summary = pd.DataFrame({
-        "Mode": ["Truck (Road)", "Train (Rail)"],
-        "Number of Containers": [truck_departures, rail_departures]
-    })
-    
-    st.subheader("Total Departures by Mode (Non-Initial Containers)")
-    st.table(departure_summary)
+        df_train = pd.DataFrame(metrics.train_queue_lengths, columns=["Time", "Train_Queue_Length"])
+        fig_train = px.line(df_train, x="Time", y="Train_Queue_Length",
+                            title="Train Queue Length Over Time",
+                            labels={"Time": "Time (hours)", "Train_Queue_Length": "Train Queue Length"})
+        st.plotly_chart(fig_train)

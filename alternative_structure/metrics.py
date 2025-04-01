@@ -62,7 +62,8 @@ class Metrics:
             "yard_time": calc_duration("entered_yard", "retrieval_ready"),
             "retrieval_time": calc_duration("retrieval_ready", "waiting_for_inland_tsp"),
             "queuing_for_tsp": calc_duration("waiting_for_inland_tsp", "loaded_for_transport"),
-            "loading_time": calc_duration("loaded_for_transport", "departed_port")
+            "loading_time": calc_duration("loaded_for_transport", "departed_port"),
+            "total_dwell_time": calc_duration("vessel_arrives", "departed_port")
         }
         self.container_records.append(record)
 
