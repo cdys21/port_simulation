@@ -88,7 +88,6 @@ def main():
     # --------------------------
     # Define Processes.
     # --------------------------
-    # Get unload_params from configuration.
     unload_params = sim_config["unload_params"]
     
     def vessel_process(env, vessel, berth_manager, yards):
@@ -150,22 +149,27 @@ def main():
     
     def termination_process(env, yards, truck_queue, train_queue):
         """
-        Terminates the simulation when all yards are empty and departure queues are empty.
+        Terminates the simulation when all yards are empty and both departure queues are empty.
         """
         while True:
             total_yard = sum(yard.get_occupancy() for yard in yards.values())
-            if total_yard == 0 and not truck_queue and not train_queue:
+            tq = len(truck_queue)
+            trq = len(train_queue)
+            print(f"Termination check at time {env.now:.2f}: yards={total_yard}, truck_queue={tq}, train_queue={trq}")
+            if total_yard == 0 and tq == 0 and trq == 0:
                 print(f"Time {env.now:.2f}: All containers have left port. Terminating simulation.")
-                env.exit()  # Stop simulation.
+                env.exit()
             yield env.timeout(1)
     
-    def progress_tracker(env, yards):
+    def progress_tracker(env, yards, truck_queue, train_queue):
         """
-        Periodically prints total containers in all yards to track progress.
+        Periodically prints total containers in all yards and sizes of departure queues.
         """
         while True:
             total = sum(yard.get_occupancy() for yard in yards.values())
-            print(f"Time {env.now:.2f}: Total containers in yards: {total}")
+            tq = len(truck_queue)
+            trq = len(train_queue)
+            print(f"Time {env.now:.2f}: Total containers in yards: {total}, truck_queue: {tq}, train_queue: {trq}")
             yield env.timeout(1)
     
     # --------------------------
@@ -178,7 +182,7 @@ def main():
     env.process(truck_departure_process(env, truck_queue, gate_resource, sim_config["gate"]["truck_processing_time"]))
     env.process(train_departure_process(env, train_queue, sim_config["trains_per_day"]))
     env.process(termination_process(env, yards, truck_queue, train_queue))
-    env.process(progress_tracker(env, yards))
+    env.process(progress_tracker(env, yards, truck_queue, train_queue))
     
     # --------------------------
     # Run the Simulation.
