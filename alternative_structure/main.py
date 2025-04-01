@@ -1,3 +1,5 @@
+# main.py
+
 import json
 import random
 import simpy
@@ -97,19 +99,30 @@ def main(progress_callback=None):
         # Create a container for each vessel container using the individual unload finish times.
         for i in range(vessel.container_count):
             storage_duration = max(0, random.normalvariate(storage_mean, storage_stdev))
+            
+            # Correctly set arrival_time at the yard individually for each container
+            container_yard_arrival = unload_finish_times[i]  # each container's exact arrival time at the yard
+
             new_container = Container(
                 container_id=container_id_counter,
-                arrival_time=env.now,  # time container reaches yard
+                arrival_time=container_yard_arrival,
                 storage_duration=storage_duration,
                 is_initial=False
             )
-            # Record unloading time for container i.
-            new_container.unloading_time = unload_finish_times[i] - berth_alloc_time
+
+            # Correct individual container unloading time
+            new_container.unloading_time = container_yard_arrival - berth_alloc_time
+
+            # Other attributes as before
             new_container.vessel_expected_arrival = vessel.scheduled_arrival
             new_container.category = container_categories[0]
             new_container.mode = "Rail" if random.random() < rail_probability else "Road"
+
+            # Add container to yard
             yards[new_container.category].add_container(new_container)
             container_id_counter += 1
+
+
         total_occ = sum(yard.get_occupancy() for yard in yards.values())
         #print(f"Time {env.now:.2f}: Total yard occupancy is now {total_occ}.")
         metrics.record_yard_occupancy(env.now, total_occ)

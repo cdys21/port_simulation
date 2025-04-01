@@ -1,4 +1,5 @@
 # yard.py
+
 import random
 random.seed(42)
 
