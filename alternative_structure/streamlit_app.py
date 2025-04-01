@@ -21,6 +21,9 @@ if st.sidebar.button("Run Simulation"):
     metrics = main(progress_callback=progress_callback)
     st.success("Simulation completed!")
     
+    # Filter non-initial container departures.
+    non_initial_departures = [record for record in metrics.container_departures if record[0] >= metrics.total_initial]
+
     # Plot Yard Occupancy Over Time.
     if metrics.yard_occupancy:
         times = [t for t, occ in metrics.yard_occupancy]
@@ -29,11 +32,11 @@ if st.sidebar.button("Run Simulation"):
                        title="Yard Occupancy Over Time")
         st.plotly_chart(fig1)
     
-    # Distribution of Container Dwell Times.
-    dwell_times = [dwell for cid, mode, t, dwell in metrics.container_departures if dwell is not None]
+    # Distribution of Container Dwell Times (only non-initial containers).
+    dwell_times = [dwell for cid, mode, t, dwell in non_initial_departures if dwell is not None]
     if dwell_times:
         fig2 = px.histogram(x=dwell_times, nbins=50, labels={'x': 'Container Dwell Time (hours)'}, 
-                            title="Distribution of Container Dwell Times")
+                            title="Distribution of Container Dwell Times (Non-Initial)")
         st.plotly_chart(fig2)
     
     # Truck Queue Length Over Time.
@@ -52,7 +55,7 @@ if st.sidebar.button("Run Simulation"):
                        title="Train Queue Length Over Time")
         st.plotly_chart(fig4)
     
-    # Create summary table for duration metrics.
+    # Create summary table for duration metrics (non-initial containers only).
     def summarize(metric_list):
         if not metric_list:
             return {"n": 0, "mean": None, "median": None, "min": None, "max": None}
@@ -65,12 +68,12 @@ if st.sidebar.button("Run Simulation"):
         }
     
     summary_data = {
-        "Ship Waiting": summarize(metrics.ship_waiting_times),
-        "Berth Queue": summarize(metrics.berth_waiting_times),
-        "Unloading": summarize(metrics.unloading_durations),
-        "Yard Storage": summarize(metrics.yard_storage_times),
-        "Stacking Retrieval": summarize(metrics.stacking_retrieval_times),
-        "Inland Transport": summarize(metrics.inland_transport_wait_times)
+        "Ship Waiting": summarize([v for v in metrics.ship_waiting_times]),
+        "Berth Queue": summarize([v for v in metrics.berth_waiting_times]),
+        "Unloading": summarize([v for v in metrics.unloading_durations]),
+        "Yard Storage": summarize([v for v in metrics.yard_storage_times]),
+        "Stacking Retrieval": summarize([v for v in metrics.stacking_retrieval_times]),
+        "Inland Transport": summarize([v for v in metrics.inland_transport_wait_times])
     }
     
     summary_rows = []
@@ -84,18 +87,17 @@ if st.sidebar.button("Run Simulation"):
             "Max": stats["max"]
         })
     df_summary = pd.DataFrame(summary_rows)
-    st.subheader("Duration Metrics Summary")
+    st.subheader("Duration Metrics Summary (All Containers)")
     st.dataframe(df_summary)
-
-    # Summarize departures by truck and rail for non-initial containers
-    total_initial = metrics.total_initial if hasattr(metrics, 'total_initial') else 0
-    truck_departures = len([c for c in metrics.container_departures if c[1] == "Road" and c[0] >= total_initial])
-    rail_departures = len([c for c in metrics.container_departures if c[1] == "Rail" and c[0] >= total_initial])
-
+    
+    # Create a summary table for departures by mode for non-initial containers.
+    truck_departures = len([record for record in non_initial_departures if record[1] == "Road"])
+    rail_departures = len([record for record in non_initial_departures if record[1] == "Rail"])
+    
     departure_summary = pd.DataFrame({
         "Mode": ["Truck (Road)", "Train (Rail)"],
         "Number of Containers": [truck_departures, rail_departures]
     })
-
+    
     st.subheader("Total Departures by Mode (Non-Initial Containers)")
     st.table(departure_summary)

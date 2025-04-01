@@ -22,10 +22,10 @@ def truck_departure_process(env, truck_queue, gate_resource, truck_processing_pa
                 truck_processing_params["max"],
                 truck_processing_params["mode"]
             )
-            processing_time = processing_time_minutes / 60.0
+            processing_time = processing_time_minutes
             #print(f"Time {env.now:.2f}: Truck departing with containers {[c.container_id for c in containers]}, processing time: {processing_time:.2f} hours")
             for c in containers:
-                if hasattr(c, 'retrieval_time'):
+                if hasattr(c, 'retrieval_time') and not c.is_initial:
                     inland_wait = env.now - c.retrieval_time
                     if metrics:
                         metrics.record_inland_transport_wait(inland_wait)
@@ -46,7 +46,7 @@ def train_departure_process(env, train_queue, trains_per_day, train_capacity, me
             departing_ids = [c.container_id for c in departing_containers]
             #print(f"Time {env.now:.2f}: Train departing with containers {departing_ids}")
             for c in departing_containers:
-                if hasattr(c, 'retrieval_time'):
+                if hasattr(c, 'retrieval_time') and not c.is_initial:
                     inland_wait = env.now - c.retrieval_time
                     if metrics:
                         metrics.record_inland_transport_wait(inland_wait)

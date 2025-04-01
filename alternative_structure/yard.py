@@ -29,7 +29,12 @@ class Yard:
         
         # Pre-populate with initial containers.
         for i in range(initial_container_count):
-            container = Container(container_id=i, arrival_time=self.env.now, storage_duration=0, is_initial=True)
+            container = Container(container_id=i, storage_duration=0, is_initial=True)
+            # Set default checkpoints for initial containers.
+            container.checkpoints["unload_finish"] = self.env.now
+            container.checkpoints["berth_allocation"] = self.env.now
+            # Optionally, you might also record a yard arrival checkpoint:
+            container.checkpoints["yard_arrival"] = self.env.now
             self.add_container(container)
 
     def add_container(self, container):

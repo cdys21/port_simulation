@@ -103,38 +103,23 @@ def main(progress_callback=None):
         cs = sim_config["container_storage"]["triangular_distribution"]
         # Assume unload_vessel now returns a list of unload finish times for each container.
         for i in range(vessel.container_count):
-            storage_duration = random.triangular(
-                sim_config["container_storage"]["triangular_distribution"]["min"],
-                sim_config["container_storage"]["triangular_distribution"]["max"],
-                sim_config["container_storage"]["triangular_distribution"]["mode"]
-            )
-            
-            # Use the individual finish time as the yard arrival time.
-            container_yard_arrival = unload_finish_times[i]
-            
+            storage_duration = random.triangular(cs["min"], cs["max"], cs["mode"])
+            container_yard_arrival = unload_finish_times[i]  # Each container's yard arrival time.
             new_container = Container(
                 container_id=container_id_counter,
                 storage_duration=storage_duration,
                 is_initial=False
             )
-            
-            # Set checkpoints:
-            new_container.checkpoints["vessel_expected_arrival"] = vessel.scheduled_arrival
+            new_container.arrival_time = container_yard_arrival  # Set the actual yard arrival time.
+            # Set checkpoints for the container.
             new_container.checkpoints["unload_finish"] = container_yard_arrival
-            new_container.checkpoints["berth_allocation"] = berth_alloc_time  # Recorded earlier in vessel_process
-            
-            # The container’s yard arrival time is the same as unload_finish.
-            # (Optionally, you could duplicate it as "yard_arrival" if you prefer.)
-            
-            new_container.category = container_categories[0]  # e.g., "TEU"
-            
-            # Use the train percentage from config.
-            train_percentage = sim_config["train"]["percentage"]
+            new_container.checkpoints["berth_allocation"] = berth_alloc_time
+            new_container.checkpoints["vessel_expected_arrival"] = vessel.scheduled_arrival
+            new_container.category = container_categories[0]
             new_container.mode = "Rail" if random.random() < train_percentage else "Road"
-            
-            # Add container to the appropriate yard.
             yards[new_container.category].add_container(new_container)
             container_id_counter += 1
+
 
 
         total_occ = sum(yard.get_occupancy() for yard in yards.values())
@@ -148,22 +133,24 @@ def main(progress_callback=None):
                 continue
             container = yield env.process(yard.retrieve_ready_container())
             if container is not None:
-                # Record retrieval time.
-                container.checkpoints["yard_retrieval"] = env.now
-                yard_storage = container.checkpoints["yard_retrieval"] - container.checkpoints["unload_finish"]
-                metrics.record_yard_storage(yard_storage)
-                stacking_retrieval = (max_stack_height - 1 - container.stacking_level) * retrieval_delay_per_move
-                metrics.record_stacking_retrieval(stacking_retrieval)
-                # For dwell time, you might compute as departure time - vessel_expected_arrival,
-                # but here we'll record the retrieval time and later compute departure times in the departure processes.
+            # Process only non-initial containers for duration metrics.
+                if not container.is_initial:
+                    yard_storage = env.now - container.arrival_time
+                    metrics.record_yard_storage(yard_storage)
+                    stacking_retrieval = (max_stack_height - 1 - container.stacking_level) * retrieval_delay_per_move
+                    metrics.record_stacking_retrieval(stacking_retrieval)
+                    # Compute dwell time only if the checkpoint exists.
+                    if "vessel_expected_arrival" in container.checkpoints:
+                        dwell_time = env.now - container.checkpoints["vessel_expected_arrival"]
+                    else:
+                        dwell_time = None
+                    metrics.record_container_departure(container.container_id, container.mode, env.now, dwell_time)
+                # In either case, assign retrieval time and queue the container.
+                container.retrieval_time = env.now
                 if container.mode == "Rail":
                     train_queue.append(container)
-                    metrics.record_container_departure(container.container_id, container.mode, env.now,
-                        env.now - container.checkpoints["vessel_expected_arrival"])
                 else:
                     truck_queue.append(container)
-                    metrics.record_container_departure(container.container_id, container.mode, env.now,
-                        env.now - container.checkpoints["vessel_expected_arrival"])
             else:
                 break
     

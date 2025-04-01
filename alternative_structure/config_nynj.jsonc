@@ -22,7 +22,7 @@
       "percentage": 0.15 // fraction of containers (50%) assigned to train (i.e. rail percentage)
     },
     "arrival_variability": {
-      "min": -1, // minimum adjustment for ship arrival (hours; negative means early)
+      "min": -0.5, // minimum adjustment for ship arrival (hours; negative means early)
       "mode": 2, // most likely adjustment (hours)
       "max": 5   // maximum adjustment (hours)
     },
@@ -45,7 +45,7 @@
       "yard_mapping": {
         "TEU": {
           "capacity": 50000, // total capacity (containers)
-          "initial_containers": 100 // pre-existing containers count
+          "initial_containers": 10000 // pre-existing containers count
         }
       }
     }
@@ -53,61 +53,61 @@
   "vessels": [
     {
       "name": "CEZANNE",
-      "containers": 26, // container count
+      "containers": 2642, // container count
       "expected_arrival_day": 1, // day of scheduled arrival (starting at 1)
       "expected_arrival": 8 // hour of scheduled arrival (24-hour clock)
     },
     {
       "name": "CCNI ANDES",
-      "containers": 23,
+      "containers": 2338,
       "expected_arrival_day": 1,
       "expected_arrival": 10
     },
     {
       "name": "CMA CGM LEO",
-      "containers": 21,
+      "containers": 2187,
       "expected_arrival_day": 1,
       "expected_arrival": 14
     },
     {
       "name": "ONE REINFORCEMENT",
-      "containers": 17,
+      "containers": 1752,
       "expected_arrival_day": 1,
       "expected_arrival": 15
     },
     {
       "name": "POLAR ECUADOR",
-      "containers": 11,
+      "containers": 1431,
       "expected_arrival_day": 1,
       "expected_arrival": 16
     },
     {
       "name": "W KITHIRA",
-      "containers": 11,
+      "containers": 1311,
       "expected_arrival_day": 2,
       "expected_arrival": 6
     },
     {
       "name": "MAERSK ATHABASCA",
-      "containers": 9,
+      "containers": 998,
       "expected_arrival_day": 2,
       "expected_arrival": 8
     },
     {
       "name": "MAERSK SENTOSA",
-      "containers": 8,
+      "containers": 896,
       "expected_arrival_day": 2,
       "expected_arrival": 8
     },
     {
       "name": "MAERSK MONTE LINZOR",
-      "containers": 8,
+      "containers": 892,
       "expected_arrival_day": 2,
       "expected_arrival": 12
     },
     {
       "name": "SUAPE EXPRESS",
-      "containers": 10,
+      "containers": 1062,
       "expected_arrival_day": 2,
       "expected_arrival": 15
     }
