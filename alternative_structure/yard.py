@@ -75,7 +75,14 @@ class Yard:
                 # Select the container with the earliest retrieval_ready time.
                 container = min(ready_containers, key=lambda c: c.checkpoints["retrieval_ready"])
                 self.containers.remove(container)
-                retrieval_delay = (self.max_stack_height - 1 - container.stacking_level) * self.retrieval_delay_per_move
+                
+                # Safe computation of stacking delay
+                if self.containers:
+                    current_highest_stacking_level = max(c.stacking_level for c in self.containers)
+                else:
+                    current_highest_stacking_level = container.stacking_level
+
+                retrieval_delay = (current_highest_stacking_level - container.stacking_level) * self.retrieval_delay_per_move
                 yield self.env.timeout(retrieval_delay)
                 container.checkpoints["waiting_for_inland_tsp"] = self.env.now
                 return container

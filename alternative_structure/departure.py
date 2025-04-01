@@ -35,12 +35,10 @@ def truck_departure_process(env, truck_queue, gate_resource, truck_processing_pa
     # Parse operating hours from config (e.g., {"start": "06:00", "end": "17:00"})
     operating_hours_dict = truck_processing_params.get("operating_hours", {"start": "00:00", "end": "24:00"})
     start_hour, end_hour = parse_operating_hours(operating_hours_dict)
-    
+
     while True:
-        # Check if we are within operating hours.
         current_hour = env.now % 24
         if not (start_hour <= current_hour < end_hour):
-            # Not within operating hours. Calculate time until next operating start.
             if current_hour < start_hour:
                 wait_time = start_hour - current_hour
             else:
@@ -62,14 +60,16 @@ def truck_departure_process(env, truck_queue, gate_resource, truck_processing_pa
                 truck_processing_params["mode"]
             )
             processing_time = processing_time_minutes / 60.0
-            # Record loaded_for_transport checkpoint for each container.
+            # Set loaded_for_transport for each container.
             for container in containers:
                 container.checkpoints["loaded_for_transport"] = env.now
-            # Process the containers (simulate loading time).
             yield env.timeout(processing_time)
-            # After processing, record departed_port checkpoint.
+            # After processing, set departed_port checkpoint.
             for container in containers:
                 container.checkpoints["departed_port"] = env.now
+                # Now record the container's final state.
+                if metrics is not None:
+                    metrics.record_container_departure(container)
 
 def train_departure_process(env, train_queue, trains_per_day, train_capacity, metrics=None):
     """
@@ -88,7 +88,9 @@ def train_departure_process(env, train_queue, trains_per_day, train_capacity, me
             departing_containers = [train_queue.pop(0) for _ in range(num_to_process)]
             for container in departing_containers:
                 container.checkpoints["loaded_for_transport"] = env.now
-            # Simulate departure (assume instantaneous for simplicity, or add a delay if needed)
+            # For simplicity, assume departure is instantaneous.
             for container in departing_containers:
                 container.checkpoints["departed_port"] = env.now
+                if metrics is not None:
+                    metrics.record_container_departure(container)
         next_departure += departure_interval

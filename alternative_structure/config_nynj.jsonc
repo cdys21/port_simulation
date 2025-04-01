@@ -45,7 +45,7 @@
       "yard_mapping": {
         "TEU": {
           "capacity": 50000, // total capacity (containers)
-          "initial_containers": 10000 // pre-existing containers count
+          "initial_containers": 100000 // pre-existing containers count
         }
       }
     }

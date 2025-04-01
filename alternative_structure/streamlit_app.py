@@ -45,7 +45,7 @@ if st.sidebar.button("Run Simulation"):
             "total_dwell_time"
         ]
 
-        st.dataframe(df_non_initial[["container_id", "mode", "vessel", "total_dwell_time", "yard_time", "retrieval_time"]])
+        st.dataframe(df_non_initial)
         
         # Select only the duration columns and melt the DataFrame into long format.
         df_durations = df_non_initial[duration_cols].melt(var_name="Duration", value_name="Hours")

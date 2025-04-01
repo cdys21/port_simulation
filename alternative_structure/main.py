@@ -43,7 +43,7 @@ def main(progress_callback=None):
     yards = {}
     for category in container_categories:
         mapping = yard_mapping.get(category, {})
-        capacity = mapping.get("capacity", 40)
+        capacity = mapping.get("capacity", 10000)
         initial_containers = mapping.get("initial_containers", 0)
         yards[category] = Yard(env, capacity, max_stack_height, retrieval_delay_per_move, initial_containers)
         # Initial containers already have their checkpoints set in Yard.
@@ -91,7 +91,6 @@ def main(progress_callback=None):
         # Unload the vessel.
         unload_finish_times = yield env.process(unload_vessel(env, vessel, berth, sim_config["unload_params"]))
         vessel_unload_duration = max(unload_finish_times) - berth_alloc_time
-        # (Optional: record vessel unloading duration if needed)
         
         # Release the berth.
         yield berth_manager.release_berth(berth)
@@ -129,7 +128,6 @@ def main(progress_callback=None):
             container = yield env.process(yard.retrieve_ready_container())
             if container is not None:
                 # At this point, yard process should have set "waiting_for_inland_tsp" for the container.
-                metrics.record_container_departure(container)
                 if container.mode == "Rail":
                     train_queue.append(container)
                 else:

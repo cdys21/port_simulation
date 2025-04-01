@@ -9,7 +9,7 @@
         "start": "06:00", // gate operating start time (local)
         "end": "17:00"    // gate operating end time (local)
       },
-      "number_of_gates": 15, // total number of gates
+      "number_of_gates": 12, // total number of gates
       "truck_processing_time": {
         "min": 0.1,   // minimum truck processing time (hours)
         "mode": 0.13,  // most likely truck processing time (hours)
@@ -35,8 +35,8 @@
     },
     "unload_params": {
       "min": 0.03, // minimum unloading time per container (hours)
-      "mode": 0.04, // most likely unloading time per container (hours)
-      "max": 0.06   // maximum unloading time per container (hours)
+      "mode": 0.4, // most likely unloading time per container (hours)
+      "max": 0.6   // maximum unloading time per container (hours)
     },
     "yard": {
       "max_stack_height": 4, // maximum stacking level
@@ -53,7 +53,7 @@
   "vessels": [
     {
       "name": "CEZANNE",
-      "containers": 1000, // container count
+      "containers": 10000, // container count
       "expected_arrival_day": 1, // day of scheduled arrival (starting at 1)
       "expected_arrival": 8 // hour of scheduled arrival (24-hour clock)
     },
