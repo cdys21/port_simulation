@@ -19,7 +19,7 @@
     "trains_per_day": 6, // number of trains departing per day
     "train": {
       "capacity": 50, // maximum number of containers per train
-      "percentage": 0.15 // fraction of containers (50%) assigned to train (i.e. rail percentage)
+      "percentage": 0.15 // fraction of containers assigned to train (i.e. rail percentage)
     },
     "arrival_variability": {
       "min": -1, // minimum adjustment for ship arrival (hours; negative means early)
@@ -39,7 +39,7 @@
       "max": 0.6   // maximum unloading time per container (hours)
     },
     "yard": {
-      "max_stack_height": 4, // maximum stacking level
+      "max_stack_height": 4, // maximum stacking level (total height if using old logic)
       "retrieval_delay_per_move": 0.1, // retrieval delay per level moved (hours; 0.1h = 6 minutes)
       "container_categories": ["TEU"],
       "yard_mapping": {
@@ -47,6 +47,12 @@
           "capacity": 50000, // total capacity (containers)
           "initial_containers": 100 // pre-existing containers count
         }
+      },
+      "stacking": {
+        "num_stacks": 2, // number of available stacks per category
+        "max_stack_height": 4, // maximum containers per individual stack
+        "retrieval_delay_per_move": 0.1, // delay per container move during retrieval (hours)
+        "stacking_strategy": "balanced_level_based" // strategy name for clarity
       }
     }
   },
