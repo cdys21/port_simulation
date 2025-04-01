@@ -1,50 +1,50 @@
 {
   "simulation": {
-    "start_time": "2023-01-06T06:00:00",
-    "berths": 4,
-    "cranes_per_berth": 4,
-    "effective_crane_availability": 1.0,
+    "start_time": "2023-01-06T06:00:00", // ISO 8601 format
+    "berths": 4, // count
+    "cranes_per_berth": 4, // count per berth
+    "effective_crane_availability": 1.0, // fraction (1.0 = 100%)
     "gate": {
       "operating_hours": {
-        "start": "06:00",
-        "end": "17:00"
+        "start": "06:00", // HH:MM local time
+        "end": "17:00"    // HH:MM local time
       },
-      "number_of_gates": 125,
+      "number_of_gates": 125, // count
       "truck_processing_time": {
-        "min": 10,
-        "mode": 13,
-        "max": 30
+        "min": 10,   // minutes
+        "mode": 13,  // minutes
+        "max": 30    // minutes
       }
     },
-    "trains_per_day": 4,
+    "trains_per_day": 4, // count per day
     "train": {
-      "capacity": 500
+      "capacity": 500 // container capacity per train
     },
     "arrival_variability": {
-      "min": -1,
-      "mode": 2,
-      "max": 5
+      "min": -1, // hours
+      "mode": 2, // hours
+      "max": 5   // hours
     },
     "container_storage": {
       "normal_distribution": {
-        "mean": 5,
-        "stdev": 1
+        "mean": 5,  // hours
+        "stdev": 1  // hours
       }
     },
     "unload_params": {
-      "min": 0.03,
-      "mode": 0.04,
-      "max": 0.06
+      "min": 0.03, // hours per container (minimum)
+      "mode": 0.04, // hours per container (most likely)
+      "max": 0.06   // hours per container (maximum)
     },
-    "rail_probability": 0.5,
+    "rail_probability": 0.5, // fraction (50% chance)
     "yard": {
-      "max_stack_height": 4,
-      "retrieval_delay_per_move": 0.1,
+      "max_stack_height": 4, // levels
+      "retrieval_delay_per_move": 0.1, // hours per level moved (0.1h = 6 minutes)
       "container_categories": ["TEU"],
       "yard_mapping": {
         "TEU": {
-          "capacity": 50000,
-          "initial_containers": 10000
+          "capacity": 50000, // total capacity (containers)
+          "initial_containers": 10000 // count of pre-existing containers
         }
       }
     }
@@ -54,7 +54,7 @@
       "name": "CEZANNE",
       "containers": 2642,
       "expected_arrival_day": 1,
-      "expected_arrival": 8
+      "expected_arrival": 8 // hour of day (24h clock)
     },
     {
       "name": "CCNI ANDES",

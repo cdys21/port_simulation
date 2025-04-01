@@ -27,14 +27,14 @@ if st.sidebar.button("Run Simulation"):
                        title="Yard Occupancy Over Time")
         st.plotly_chart(fig1)
     
-    # Plot Distribution of Container Dwell Times (vessel expected arrival to departure)
+    # Distribution of Container Dwell Times.
     dwell_times = [dwell for cid, mode, t, dwell in metrics.container_departures if dwell is not None]
     if dwell_times:
         fig2 = px.histogram(x=dwell_times, nbins=50, labels={'x': 'Container Dwell Time (hours)'}, 
                             title="Distribution of Container Dwell Times")
         st.plotly_chart(fig2)
     
-    # Plot Truck Queue Length Over Time.
+    # Truck Queue Length Over Time.
     if metrics.truck_queue_lengths:
         tq_times = [t for t, length in metrics.truck_queue_lengths]
         tq_lengths = [length for t, length in metrics.truck_queue_lengths]
@@ -42,7 +42,7 @@ if st.sidebar.button("Run Simulation"):
                        title="Truck Queue Length Over Time")
         st.plotly_chart(fig3)
     
-    # Plot Train Queue Length Over Time.
+    # Train Queue Length Over Time.
     if metrics.train_queue_lengths:
         trq_times = [t for t, length in metrics.train_queue_lengths]
         trq_lengths = [length for t, length in metrics.train_queue_lengths]
@@ -50,11 +50,10 @@ if st.sidebar.button("Run Simulation"):
                        title="Train Queue Length Over Time")
         st.plotly_chart(fig4)
     
-    # Create a summary table for duration metrics.
-    # We'll summarize: ship_waiting_times, berth_waiting_times, unloading_durations, yard_storage_times, stacking_retrieval_times, inland_transport_wait_times.
+    # Create summary table for duration metrics.
     def summarize(metric_list):
         if not metric_list:
-            return {"n":0, "mean": None, "median": None, "min": None, "max": None}
+            return {"n": 0, "mean": None, "median": None, "min": None, "max": None}
         return {
             "n": len(metric_list),
             "mean": round(sum(metric_list) / len(metric_list), 2),

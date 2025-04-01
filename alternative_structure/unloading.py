@@ -13,55 +13,35 @@ def unload_container(unload_time_params):
     )
 
 def crane_unload(env, containers_to_unload, unload_time_params):
-    """
-    Simulate a single crane unloading a given number of containers.
-    
-    Args:
-        env (simpy.Environment): The simulation environment.
-        containers_to_unload (int): Number of containers assigned to this crane.
-        unload_time_params (dict): Parameters for the triangular distribution.
-        
-    Yields:
-        env.timeout for each container unloading.
-    """
+    finish_times = []
     for _ in range(containers_to_unload):
-        t = unload_container(unload_time_params)
+        t = random.triangular(
+            unload_time_params["min"],
+            unload_time_params["max"],
+            unload_time_params["mode"]
+        )
         yield env.timeout(t)
+        finish_times.append(env.now)
+    return finish_times
 
 def unload_vessel(env, vessel, berth, unload_time_params):
-    """
-    Simulate the unloading process for a vessel using available effective cranes from the berth.
-    
-    Args:
-        env (simpy.Environment): The simulation environment.
-        vessel: Object with an attribute container_count.
-        berth: Object with an attribute effective_cranes.
-        unload_time_params (dict): Parameters for the unloading triangular distribution.
-        
-    Returns:
-        float: The total unloading duration.
-    """
     effective_cranes = berth.effective_cranes
     total_containers = vessel.container_count
-    
-    # Divide containers evenly among the available cranes.
     base = total_containers // effective_cranes
     remainder = total_containers % effective_cranes
-    
     unloading_processes = []
     start_time = env.now
-    
-    # For each crane, assign its share of containers and start its unloading process.
     for i in range(effective_cranes):
-        # Distribute the remainder among the first few cranes.
         containers_for_crane = base + (1 if i < remainder else 0)
         unloading_processes.append(env.process(crane_unload(env, containers_for_crane, unload_time_params)))
-    
-    # Wait for all cranes to complete unloading.
-    yield simpy.events.AllOf(env, unloading_processes)
-    unloading_duration = env.now - start_time
-    return unloading_duration
-
+    results = yield simpy.events.AllOf(env, unloading_processes)
+    finish_times = []
+    for key in results:
+        finish_times.extend(results[key])
+    finish_times.sort()
+    # Return a list of unloading durations for each container.
+    container_unload_durations = [ft - start_time for ft in finish_times]
+    return container_unload_durations
 
 ## Testing the unloading module.
 #if __name__ == '__main__':
