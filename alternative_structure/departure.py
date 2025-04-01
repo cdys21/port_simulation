@@ -22,7 +22,7 @@ def parse_operating_hours(operating_hours_dict):
     end_hour = float(end_parts[0]) + float(end_parts[1]) / 60.0
     return start_hour, end_hour
 
-def truck_departure_process(env, truck_queue, gate_resource, truck_processing_params, metrics=None):
+def truck_departure_process(env, truck_queue, gate_resource, truck_processing_params, op_hours, metrics=None):
     """
     Continuously processes truck departures.
     
@@ -33,8 +33,7 @@ def truck_departure_process(env, truck_queue, gate_resource, truck_processing_pa
         - "departed_port": when the container departs (after processing delay).
     """
     # Parse operating hours from config (e.g., {"start": "06:00", "end": "17:00"})
-    operating_hours_dict = truck_processing_params.get("operating_hours", {"start": "00:00", "end": "24:00"})
-    start_hour, end_hour = parse_operating_hours(operating_hours_dict)
+    start_hour, end_hour = parse_operating_hours(op_hours)
 
     while True:
         current_hour = env.now % 24

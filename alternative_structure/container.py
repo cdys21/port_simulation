@@ -19,9 +19,8 @@ class Container:
         self.is_initial = is_initial
         self.mode = None
         self.checkpoints = {}  # Expected keys: 'vessel', 'vessel_scheduled_arrival', 'vessel_arrives', 'vessel_berths', 'entered_yard', 'retrieval_ready', 'waiting_for_inland_tsp', 'loaded_for_transport', 'departed_port'
-        self.stacking_level = None
 
     def __str__(self):
         init_status = "Initial" if self.is_initial else "Arrived"
         return (f"Container(id={self.container_id}, category={self.category}, {init_status}, "
-                f"mode={self.mode}, stacking_level={self.stacking_level}, checkpoints={self.checkpoints})")
+                f"mode={self.mode}, checkpoints={self.checkpoints})")

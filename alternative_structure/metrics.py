@@ -47,7 +47,6 @@ class Metrics:
             "container_id": container.container_id,
             "is_initial": container.is_initial,
             "mode": container.mode,
-            "level": container.stacking_level,
             "vessel": cp.get("vessel", None),
             "vessel_scheduled_arrival": cp.get("vessel_scheduled_arrival", None),
             "vessel_arrives": cp.get("vessel_arrives", None),

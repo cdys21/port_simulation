@@ -5,7 +5,7 @@ random.seed(42)
 
 import simpy
 import statistics
-import commentjson as json  # Using commentjson for JSON with comments
+import commentjson as json
 
 def load_config(file_path):
     with open(file_path, 'r') as f:
@@ -25,7 +25,7 @@ class Termination(Exception):
 def main(progress_callback=None):
     random.seed(42)
     env = simpy.Environment()
-    config = load_config("config.jsonc")
+    config = load_config("config_exp.jsonc")
     sim_config = config["simulation"]
     metrics = Metrics()
     
@@ -38,14 +38,13 @@ def main(progress_callback=None):
     # Setup Yards.
     container_categories = sim_config["yard"]["container_categories"]
     yard_mapping = sim_config["yard"]["yard_mapping"]
-    max_stack_height = sim_config["yard"]["max_stack_height"]
     retrieval_delay_per_move = sim_config["yard"]["retrieval_delay_per_move"]
     yards = {}
     for category in container_categories:
         mapping = yard_mapping.get(category, {})
         capacity = mapping.get("capacity", 10000)
         initial_containers = mapping.get("initial_containers", 0)
-        yards[category] = Yard(env, capacity, max_stack_height, retrieval_delay_per_move, initial_containers)
+        yards[category] = Yard(env, capacity, retrieval_delay_per_move, initial_containers)
         # Initial containers already have their checkpoints set in Yard.
     total_initial = sum(yard.get_occupancy() for yard in yards.values())
     metrics.record_yard_utilization(0, "all", total_initial)
@@ -125,25 +124,29 @@ def main(progress_callback=None):
             if yard.get_occupancy() == 0:
                 yield env.timeout(1)
                 continue
-            container = yield env.process(yard.retrieve_ready_container())
-            if container is not None:
-                # At this point, yard process should have set "waiting_for_inland_tsp" for the container.
-                if container.mode == "Rail":
-                    train_queue.append(container)
-                else:
-                    truck_queue.append(container)
+    
+            # Retrieve all ready containers in one batch.
+            ready_containers = yield env.process(yard.retrieve_ready_containers())
+            if ready_containers:
+                for container in ready_containers:
+                    # At this point, the yard process has set the "waiting_for_inland_tsp" checkpoint.
+                    if container.mode == "Rail":
+                        train_queue.append(container)
+                    else:
+                        truck_queue.append(container)
             else:
-                break
+                # No container is ready, wait a bit before checking again.
+                yield env.timeout(0.1)
 
     def termination_process(env, yards, truck_queue, train_queue):
         while True:
             total_yard = sum(yard.get_occupancy() for yard in yards.values())
             tq = len(truck_queue)
             trq = len(train_queue)
-            if total_yard == 0 and tq == 0 and trq == 0:
+            if total_yard == 0 and tq == 0 and trq == 0 and env.now >= 24:
                 raise Termination
             yield env.timeout(1)
-    
+
     def progress_tracker(env, yards, truck_queue, train_queue):
         total_capacity = sum(yard.capacity for yard in yards.values())
         while True:
@@ -166,7 +169,7 @@ def main(progress_callback=None):
         env.process(yard_to_departure(env, yard_instance, truck_queue, train_queue))
     
     # Start departure processes.
-    env.process(truck_departure_process(env, truck_queue, gate_resource, sim_config["gate"]["truck_processing_time"], metrics))
+    env.process(truck_departure_process(env, truck_queue, gate_resource, sim_config["gate"]["truck_processing_time"], sim_config["gate"]["operating_hours"], metrics))
     env.process(train_departure_process(env, train_queue, sim_config["trains_per_day"], sim_config["train"]["capacity"], metrics))
     
     # Start termination and progress tracking.

@@ -10,18 +10,14 @@ class Yard:
     Attributes:
         env (simpy.Environment): The simulation environment.
         capacity (int): Maximum number of containers the yard can hold.
-        max_stack_height (int): Maximum stacking height allowed.
         retrieval_delay_per_move (float): Delay (in hours) per level movement when retrieving a container.
         containers (list): List of containers currently in the yard.
     """
-    def __init__(self, env, capacity, max_stack_height, retrieval_delay_per_move=0.1, initial_container_count=0):
+    def __init__(self, env, capacity, retrieval_delay_per_move=0.1, initial_container_count=0):
         self.env = env
         self.capacity = capacity
-        self.max_stack_height = max_stack_height
         self.retrieval_delay_per_move = retrieval_delay_per_move
         self.containers = []
-        # Calculate containers per stacking level.
-        self.per_level = capacity // max_stack_height
         
         # Pre-populate with initial containers.
         for i in range(initial_container_count):
@@ -34,7 +30,7 @@ class Yard:
     
     def add_container(self, container):
         """
-        Add a container to the yard and assign its stacking level.
+        Add a container to the yard.
         
         Args:
             container (Container): The container to add.
@@ -44,8 +40,6 @@ class Yard:
         """
         if len(self.containers) >= self.capacity:
             raise Exception("Yard is full. Cannot add more containers.")
-        # Assign stacking level based on current occupancy.
-        container.stacking_level = len(self.containers) // self.per_level
         self.containers.append(container)
     
     def get_occupancy(self):
@@ -54,12 +48,48 @@ class Yard:
         """
         return len(self.containers)
     
+    def retrieve_ready_containers(self):
+        """
+        Retrieves all containers that are ready for departure.
+        A container is considered ready if the current time is greater than or equal to its
+        'retrieval_ready' checkpoint.
+        
+        Yields:
+            simpy.timeout: A delay corresponding to processing all ready containers.
+        
+        Returns:
+            List[Container]: A list of containers that are ready for departure, each with its
+                            'waiting_for_inland_tsp' checkpoint updated.
+        """
+        while True:
+            # Identify all containers ready for retrieval.
+            ready_containers = [c for c in self.containers 
+                                if "retrieval_ready" in c.checkpoints and self.env.now >= c.checkpoints["retrieval_ready"]]
+            if ready_containers:
+                # Remove all ready containers from the record.
+                for container in ready_containers:
+                    self.containers.remove(container)
+                    container.checkpoints["waiting_for_inland_tsp"] = self.env.now
+                return ready_containers
+            else:
+                # If no containers are ready, wait until the next container becomes ready.
+                if self.containers:
+                    next_ready_time = min(
+                        c.checkpoints["retrieval_ready"] 
+                        for c in self.containers if "retrieval_ready" in c.checkpoints
+                    )
+                    wait_time = next_ready_time - self.env.now
+                    if wait_time > 0:
+                        yield self.env.timeout(wait_time)
+                else:
+                    return []
+
+    
     def retrieve_ready_container(self):
         """
         Retrieve the container that is ready to depart.
         A container is considered ready if the current time is greater than or equal to its
-        'retrieval_ready' checkpoint. Before returning, a retrieval delay based on the container's
-        stacking level is applied.
+        'retrieval_ready' checkpoint.
         
         Yields:
             simpy.timeout: Delay for waiting or retrieval delay.
@@ -76,13 +106,7 @@ class Yard:
                 container = min(ready_containers, key=lambda c: c.checkpoints["retrieval_ready"])
                 self.containers.remove(container)
                 
-                # Safe computation of stacking delay
-                if self.containers:
-                    current_highest_stacking_level = max(c.stacking_level for c in self.containers)
-                else:
-                    current_highest_stacking_level = container.stacking_level
-
-                retrieval_delay = (current_highest_stacking_level - container.stacking_level) * self.retrieval_delay_per_move
+                retrieval_delay = self.retrieval_delay_per_move
                 yield self.env.timeout(retrieval_delay)
                 container.checkpoints["waiting_for_inland_tsp"] = self.env.now
                 return container
