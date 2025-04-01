@@ -2,11 +2,16 @@
 
 import random
 import simpy
-random.seed(42)
 
 def unload_container(unload_time_params):
     """
     Generate a random unloading time for one container using a triangular distribution.
+    
+    Args:
+        unload_time_params (dict): Contains 'min', 'mode', and 'max' values for unloading time (in hours).
+    
+    Returns:
+        float: The simulated unloading time for a container (hours).
     """
     return random.triangular(
         unload_time_params["min"],
@@ -15,6 +20,21 @@ def unload_container(unload_time_params):
     )
 
 def crane_unload(env, containers_to_unload, unload_time_params):
+    """
+    Simulate the unloading of containers by a single crane.
+    
+    For each container, a triangular distribution is used to determine the unloading time.
+    The function yields a timeout for each container and returns a list of finish times,
+    which represent the time each container finishes unloading and thus "entered_yard".
+    
+    Args:
+        env (simpy.Environment): The simulation environment.
+        containers_to_unload (int): Number of containers the crane will unload.
+        unload_time_params (dict): Parameters for the triangular distribution (min, mode, max).
+    
+    Returns:
+        list: Sorted list of finish times for each container unloaded.
+    """
     finish_times = []
     for _ in range(containers_to_unload):
         t = random.triangular(
@@ -27,53 +47,37 @@ def crane_unload(env, containers_to_unload, unload_time_params):
     return finish_times
 
 def unload_vessel(env, vessel, berth, unload_time_params):
+    """
+    Unload a vessel using multiple cranes simultaneously.
+    
+    This function divides the vessel's containers among the effective cranes available at the berth.
+    It creates a separate unloading process for each crane. The finish times returned by each crane
+    represent the time when a container finishes unloading and "entered_yard".
+    
+    Args:
+        env (simpy.Environment): The simulation environment.
+        vessel: Vessel object (assumed to have a 'container_count' attribute).
+        berth: Berth object (assumed to have an attribute 'effective_cranes').
+        unload_time_params (dict): Parameters for the triangular distribution (min, mode, max).
+    
+    Returns:
+        list: A sorted list of finish times for all containers unloaded from the vessel.
+    """
     effective_cranes = berth.effective_cranes
     total_containers = vessel.container_count
     base = total_containers // effective_cranes
     remainder = total_containers % effective_cranes
     unloading_processes = []
-    start_time = env.now
+    
     for i in range(effective_cranes):
+        # Determine the number of containers assigned to this crane.
         containers_for_crane = base + (1 if i < remainder else 0)
         unloading_processes.append(env.process(crane_unload(env, containers_for_crane, unload_time_params)))
+    
     results = yield simpy.events.AllOf(env, unloading_processes)
+    
     finish_times = []
     for key in results:
         finish_times.extend(results[key])
     finish_times.sort()
-    # Return the list of actual finish times (each container’s yard arrival time)
     return finish_times
-
-## Testing the unloading module.
-#if __name__ == '__main__':
-#    # Set seed for reproducibility.
-#    random.seed(42)
-#    
-#    # Create a SimPy simulation environment.
-#    env = simpy.Environment()
-#    
-#    # Dummy vessel and berth classes for testing.
-#    class DummyVessel:
-#        def __init__(self, container_count):
-#            self.container_count = container_count
-#    
-#    class DummyBerth:
-#        def __init__(self, effective_cranes):
-#            self.effective_cranes = effective_cranes
-#    
-#    # Create a dummy vessel with 100 containers.
-#    vessel = DummyVessel(container_count=1000)
-#    # Create a dummy berth with 4 effective cranes.
-#    berth = DummyBerth(effective_cranes=4)
-#    
-#    # Default unloading time parameters (in hours per container).
-#    unload_time_params = {"min": 0.03, "mode": 0.04, "max": 0.06}
-#    
-#    def test_unloading(env, vessel, berth, unload_time_params):
-#        print(f"Time {env.now:.2f}: Starting unloading process")
-#        unloading_duration = yield env.process(unload_vessel(env, vessel, berth, unload_time_params))
-#        print(f"Time {env.now:.2f}: Unloading completed in {unloading_duration:.4f} hours")
-#    
-#    # Start the test process.
-#    env.process(test_unloading(env, vessel, berth, unload_time_params))
-#    env.run()

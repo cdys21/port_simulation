@@ -4,15 +4,54 @@ import random
 random.seed(42)
 import simpy
 
+def parse_operating_hours(operating_hours_dict):
+    """
+    Convert operating hours from a dictionary with string values (HH:MM) into numerical hours.
+    
+    Args:
+        operating_hours_dict (dict): e.g., {"start": "06:00", "end": "17:00"}
+    
+    Returns:
+        tuple: (start_hour, end_hour) as floats.
+    """
+    start_str = operating_hours_dict.get("start", "00:00")
+    end_str = operating_hours_dict.get("end", "24:00")
+    start_parts = start_str.split(":")
+    end_parts = end_str.split(":")
+    start_hour = float(start_parts[0]) + float(start_parts[1]) / 60.0
+    end_hour = float(end_parts[0]) + float(end_parts[1]) / 60.0
+    return start_hour, end_hour
+
 def truck_departure_process(env, truck_queue, gate_resource, truck_processing_params, metrics=None):
     """
-    Continuously processes truck departures. Each truck processes up to 2 containers.
-    For each container processed, inland transport wait = departure time - container.retrieval_time.
+    Continuously processes truck departures.
+    
+    - Checks that current simulation time is within operating hours.
+    - Processes up to 2 containers at a time using a gate resource.
+    - For each container, records:
+        - "loaded_for_transport": when the container is loaded onto a truck.
+        - "departed_port": when the container departs (after processing delay).
     """
+    # Parse operating hours from config (e.g., {"start": "06:00", "end": "17:00"})
+    operating_hours_dict = truck_processing_params.get("operating_hours", {"start": "00:00", "end": "24:00"})
+    start_hour, end_hour = parse_operating_hours(operating_hours_dict)
+    
     while True:
+        # Check if we are within operating hours.
+        current_hour = env.now % 24
+        if not (start_hour <= current_hour < end_hour):
+            # Not within operating hours. Calculate time until next operating start.
+            if current_hour < start_hour:
+                wait_time = start_hour - current_hour
+            else:
+                wait_time = 24 - current_hour + start_hour
+            yield env.timeout(wait_time)
+            continue
+
         if len(truck_queue) == 0:
             yield env.timeout(0.1)
             continue
+
         with gate_resource.request() as req:
             yield req
             num_to_process = min(2, len(truck_queue))
@@ -22,19 +61,23 @@ def truck_departure_process(env, truck_queue, gate_resource, truck_processing_pa
                 truck_processing_params["max"],
                 truck_processing_params["mode"]
             )
-            processing_time = processing_time_minutes
-            #print(f"Time {env.now:.2f}: Truck departing with containers {[c.container_id for c in containers]}, processing time: {processing_time:.2f} hours")
-            for c in containers:
-                if hasattr(c, 'retrieval_time') and not c.is_initial:
-                    inland_wait = env.now - c.retrieval_time
-                    if metrics:
-                        metrics.record_inland_transport_wait(inland_wait)
+            processing_time = processing_time_minutes / 60.0
+            # Record loaded_for_transport checkpoint for each container.
+            for container in containers:
+                container.checkpoints["loaded_for_transport"] = env.now
+            # Process the containers (simulate loading time).
             yield env.timeout(processing_time)
+            # After processing, record departed_port checkpoint.
+            for container in containers:
+                container.checkpoints["departed_port"] = env.now
 
 def train_departure_process(env, train_queue, trains_per_day, train_capacity, metrics=None):
     """
     Continuously schedules train departures at fixed intervals and processes up to train_capacity containers per departure.
-    For each container processed, inland transport wait = departure time - container.retrieval_time.
+    
+    For each container processed, records:
+        - "loaded_for_transport": timestamp when container is loaded onto a train.
+        - "departed_port": timestamp when container departs.
     """
     departure_interval = 24 / trains_per_day
     next_departure = env.now
@@ -43,14 +86,9 @@ def train_departure_process(env, train_queue, trains_per_day, train_capacity, me
         if train_queue:
             num_to_process = min(train_capacity, len(train_queue))
             departing_containers = [train_queue.pop(0) for _ in range(num_to_process)]
-            departing_ids = [c.container_id for c in departing_containers]
-            #print(f"Time {env.now:.2f}: Train departing with containers {departing_ids}")
-            for c in departing_containers:
-                if hasattr(c, 'retrieval_time') and not c.is_initial:
-                    inland_wait = env.now - c.retrieval_time
-                    if metrics:
-                        metrics.record_inland_transport_wait(inland_wait)
-        else:
-            pass
-            #print(f"Time {env.now:.2f}: Train departing with no containers")
+            for container in departing_containers:
+                container.checkpoints["loaded_for_transport"] = env.now
+            # Simulate departure (assume instantaneous for simplicity, or add a delay if needed)
+            for container in departing_containers:
+                container.checkpoints["departed_port"] = env.now
         next_departure += departure_interval
