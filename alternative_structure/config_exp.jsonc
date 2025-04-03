@@ -34,9 +34,9 @@
       }
     },
     "unload_params": {
-      "min": 0.03, // minimum unloading time per container (hours)
-      "mode": 0.4, // most likely unloading time per container (hours)
-      "max": 0.6   // maximum unloading time per container (hours)
+      "min": 0.01, // minimum unloading time per container (hours)
+      "mode": 0.03, // most likely unloading time per container (hours)
+      "max": 0.5   // maximum unloading time per container (hours)
     },
     "yard": {
       "retrieval_delay_per_move": 0.1, // retrieval delay per level moved (hours; 0.1h = 6 minutes)

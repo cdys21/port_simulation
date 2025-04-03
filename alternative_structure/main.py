@@ -29,13 +29,13 @@ def main(progress_callback=None):
     sim_config = config["simulation"]
     metrics = Metrics()
     
-    # Setup Berth Manager.
+    # Setup Berth Manager
     num_berths = sim_config["berths"]
     cranes_per_berth = sim_config["cranes_per_berth"]
     effective_crane_availability = sim_config["effective_crane_availability"]
     berth_manager = BerthManager(env, num_berths, cranes_per_berth, effective_crane_availability)
     
-    # Setup Yards.
+    # Setup Yards
     container_categories = sim_config["yard"]["container_categories"]
     yard_mapping = sim_config["yard"]["yard_mapping"]
     retrieval_delay_per_move = sim_config["yard"]["retrieval_delay_per_move"]
@@ -45,23 +45,23 @@ def main(progress_callback=None):
         capacity = mapping.get("capacity", 10000)
         initial_containers = mapping.get("initial_containers", 0)
         yards[category] = Yard(env, capacity, retrieval_delay_per_move, initial_containers)
-        # Initial containers already have their checkpoints set in Yard.
+        # Initial containers already have their checkpoints set in Yard
     total_initial = sum(yard.get_occupancy() for yard in yards.values())
     metrics.record_yard_utilization(0, "all", total_initial)
-    metrics.total_initial = total_initial  # For later use in summarizing departures.
+    metrics.total_initial = total_initial  # For later use in summarizing departures
     
-    # Assign departure mode for pre-existing containers.
+    # Assign departure mode for pre-existing containers
     train_percentage = sim_config["train"]["percentage"]
     for category in container_categories:
         for container in yards[category].containers:
             container.mode = "Rail" if random.random() < train_percentage else "Road"
     
-    # Setup Departure Queues and Gate Resource.
+    # Setup Departure Queues and Gate Resource
     truck_queue = []
     train_queue = []
     gate_resource = simpy.Resource(env, capacity=sim_config["gate"]["number_of_gates"])
     
-    # Create Vessel Objects.
+    # Create Vessel Objects
     arrival_variability = sim_config["arrival_variability"]
     vessels = []
     for vessel_data in config["vessels"]:
@@ -74,79 +74,60 @@ def main(progress_callback=None):
         )
         vessel_obj.adjust_arrival()  # Sets vessel.actual_arrival, corresponding to "vessel_arrives"
         vessels.append(vessel_obj)
-        # Optionally, record vessel info in metrics if desired.
     
     container_id_counter = total_initial
     
-    def vessel_process(env, vessel, berth_manager, yards):
-        nonlocal container_id_counter
-        # Wait until the vessel actually arrives.
+    def vessel_process(env, vessel, berth_manager, yards, container_id_counter, train_percentage, sim_config, container_categories):
+        # Wait until the vessel actually arrives
         yield env.timeout(vessel.actual_arrival)
         
-        # Request a berth.
+        # Request a berth
         berth = yield berth_manager.request_berth()
         berth_alloc_time = env.now  # This is "vessel_berths"
         
-        # Unload the vessel.
-        unload_finish_times = yield env.process(unload_vessel(env, vessel, berth, sim_config["unload_params"]))
-        vessel_unload_duration = max(unload_finish_times) - berth_alloc_time
+        # Unload the vessel, adding containers to the yard as they are unloaded
+        yield env.process(unload_vessel(
+            env, vessel, berth, sim_config["unload_params"],
+            yards[container_categories[0]], container_id_counter, train_percentage, sim_config, container_categories
+        ))
         
-        # Release the berth.
+        # Release the berth
         yield berth_manager.release_berth(berth)
         
-        # For each container unloaded, create a new container and set checkpoints.
-        cs = sim_config["container_storage"]["triangular_distribution"]
-        for i in range(vessel.container_count):
-            storage_duration = random.triangular(cs["min"], cs["max"], cs["mode"])
-            container_yard_arrival = unload_finish_times[i]  # This time becomes "entered_yard"
-            new_container = Container(container_id=container_id_counter, is_initial=False)
-            # Record vessel-related checkpoints.
-            new_container.checkpoints["vessel"] = vessel.name
-            new_container.checkpoints["vessel_scheduled_arrival"] = vessel.scheduled_arrival
-            new_container.checkpoints["vessel_arrives"] = vessel.actual_arrival
-            new_container.checkpoints["vessel_berths"] = berth_alloc_time
-            # Record yard-related checkpoints.
-            new_container.checkpoints["entered_yard"] = container_yard_arrival
-            new_container.checkpoints["retrieval_ready"] = container_yard_arrival + storage_duration
-            # Mode assignment.
-            new_container.mode = "Rail" if random.random() < train_percentage else "Road"
-            # Add the container to the appropriate yard.
-            # Assuming container_categories[0] is used.
-            new_container.category = container_categories[0]
-            yards[new_container.category].add_container(new_container)
-            container_id_counter += 1
-
+        # Update container_id_counter for the next vessel
+        container_id_counter += vessel.container_count
+        
+        # Record yard utilization
         total_occ = sum(yard.get_occupancy() for yard in yards.values())
         metrics.record_yard_utilization(env.now, "all", total_occ)
     
     def yard_to_departure(env, yard, truck_queue, train_queue):
         while True:
-            if yard.get_occupancy() == 0:
-                yield env.timeout(1)
-                continue
-    
-            # Retrieve all ready containers in one batch.
-            ready_containers = yield env.process(yard.retrieve_ready_containers())
-            if ready_containers:
-                for container in ready_containers:
-                    # At this point, the yard process has set the "waiting_for_inland_tsp" checkpoint.
-                    if container.mode == "Rail":
-                        train_queue.append(container)
+            if yard.containers:
+                next_ready_time = min(c.checkpoints["retrieval_ready"] for c in yard.containers if "retrieval_ready" in c.checkpoints)
+                wait_time = max(0, next_ready_time - env.now)
+                yield env.timeout(wait_time)
+                ready_containers = [c for c in yard.containers if "retrieval_ready" in c.checkpoints and env.now >= c.checkpoints["retrieval_ready"]]
+                for c in ready_containers:
+                    yard.containers.remove(c)
+                    c.checkpoints["waiting_for_inland_tsp"] = env.now
+                    if c.mode == "Rail":
+                        train_queue.append(c)
                     else:
-                        truck_queue.append(container)
+                        truck_queue.append(c)
             else:
-                # No container is ready, wait a bit before checking again.
-                yield env.timeout(0.1)
-
-    def termination_process(env, yards, truck_queue, train_queue):
+                yield env.timeout(1)
+    
+    def termination_process(env, yards, truck_queue, train_queue, vessel_processes):
+        yield simpy.events.AllOf(env, vessel_processes)
         while True:
             total_yard = sum(yard.get_occupancy() for yard in yards.values())
             tq = len(truck_queue)
             trq = len(train_queue)
-            if total_yard == 0 and tq == 0 and trq == 0 and env.now >= 24:
+            if total_yard == 0 and tq == 0 and trq == 0:
                 raise Termination
             yield env.timeout(1)
-
+    
     def progress_tracker(env, yards, truck_queue, train_queue):
         total_capacity = sum(yard.capacity for yard in yards.values())
         while True:
@@ -160,20 +141,26 @@ def main(progress_callback=None):
                 progress_callback(total, total_capacity, tq, trq, env.now)
             yield env.timeout(1)
     
-    # Start vessel processes.
+    # Start vessel processes
+    vessel_processes = []
     for vessel in vessels:
-        env.process(vessel_process(env, vessel, berth_manager, yards))
+        proc = env.process(vessel_process(
+            env, vessel, berth_manager, yards, container_id_counter,
+            train_percentage, sim_config, container_categories
+        ))
+        vessel_processes.append(proc)
+        container_id_counter += vessel.container_count  # Increment for the next vessel
     
-    # Start yard-to-departure processes for each yard.
+    # Start yard-to-departure processes for each yard
     for yard_instance in yards.values():
         env.process(yard_to_departure(env, yard_instance, truck_queue, train_queue))
     
-    # Start departure processes.
+    # Start departure processes
     env.process(truck_departure_process(env, truck_queue, gate_resource, sim_config["gate"]["truck_processing_time"], sim_config["gate"]["operating_hours"], metrics))
     env.process(train_departure_process(env, train_queue, sim_config["trains_per_day"], sim_config["train"]["capacity"], metrics))
     
-    # Start termination and progress tracking.
-    env.process(termination_process(env, yards, truck_queue, train_queue))
+    # Start termination and progress tracking
+    env.process(termination_process(env, yards, truck_queue, train_queue, vessel_processes))
     env.process(progress_tracker(env, yards, truck_queue, train_queue))
     
     try:

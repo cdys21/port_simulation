@@ -2,6 +2,7 @@
 
 import random
 import simpy
+from container import Container
 
 def unload_container(unload_time_params):
     """
@@ -19,65 +20,42 @@ def unload_container(unload_time_params):
         unload_time_params["mode"]
     )
 
-def crane_unload(env, containers_to_unload, unload_time_params):
-    """
-    Simulate the unloading of containers by a single crane.
-    
-    For each container, a triangular distribution is used to determine the unloading time.
-    The function yields a timeout for each container and returns a list of finish times,
-    which represent the time each container finishes unloading and thus "entered_yard".
-    
-    Args:
-        env (simpy.Environment): The simulation environment.
-        containers_to_unload (int): Number of containers the crane will unload.
-        unload_time_params (dict): Parameters for the triangular distribution (min, mode, max).
-    
-    Returns:
-        list: Sorted list of finish times for each container unloaded.
-    """
-    finish_times = []
+def crane_unload(env, containers_to_unload, unload_time_params, yard, vessel, container_id_start, train_percentage, sim_config, container_categories):
+    container_id = container_id_start
+    cs = sim_config["container_storage"]["triangular_distribution"]  # Storage duration parameters
     for _ in range(containers_to_unload):
-        t = random.triangular(
-            unload_time_params["min"],
-            unload_time_params["max"],
-            unload_time_params["mode"]
-        )
+        t = random.triangular(unload_time_params["min"], unload_time_params["max"], unload_time_params["mode"])
         yield env.timeout(t)
-        finish_times.append(env.now)
-    return finish_times
+        # Create and configure the container
+        new_container = Container(container_id=container_id, is_initial=False)
+        new_container.checkpoints["vessel"] = vessel.name
+        new_container.checkpoints["vessel_scheduled_arrival"] = vessel.scheduled_arrival
+        new_container.checkpoints["vessel_arrives"] = vessel.actual_arrival
+        new_container.checkpoints["vessel_berths"] = env.now - t  # When unloading started
+        new_container.checkpoints["entered_yard"] = env.now
+        # Set retrieval_ready based on storage duration
+        storage_duration = random.triangular(cs["min"], cs["max"], cs["mode"])
+        new_container.checkpoints["retrieval_ready"] = env.now + storage_duration
+        # Assign mode
+        new_container.mode = "Rail" if random.random() < train_percentage else "Road"
+        # Set category (use the first category for simplicity, adjust if needed)
+        new_container.category = container_categories[0]
+        # Add the container to the yard immediately
+        yard.add_container(new_container)
+        container_id += 1
 
-def unload_vessel(env, vessel, berth, unload_time_params):
-    """
-    Unload a vessel using multiple cranes simultaneously.
-    
-    This function divides the vessel's containers among the effective cranes available at the berth.
-    It creates a separate unloading process for each crane. The finish times returned by each crane
-    represent the time when a container finishes unloading and "entered_yard".
-    
-    Args:
-        env (simpy.Environment): The simulation environment.
-        vessel: Vessel object (assumed to have a 'container_count' attribute).
-        berth: Berth object (assumed to have an attribute 'effective_cranes').
-        unload_time_params (dict): Parameters for the triangular distribution (min, mode, max).
-    
-    Returns:
-        list: A sorted list of finish times for all containers unloaded from the vessel.
-    """
+def unload_vessel(env, vessel, berth, unload_time_params, yard, container_id_start, train_percentage, sim_config, container_categories):
     effective_cranes = berth.effective_cranes
     total_containers = vessel.container_count
     base = total_containers // effective_cranes
     remainder = total_containers % effective_cranes
-    unloading_processes = []
-    
+    crane_processes = []
+    current_container_id = container_id_start
     for i in range(effective_cranes):
-        # Determine the number of containers assigned to this crane.
         containers_for_crane = base + (1 if i < remainder else 0)
-        unloading_processes.append(env.process(crane_unload(env, containers_for_crane, unload_time_params)))
-    
-    results = yield simpy.events.AllOf(env, unloading_processes)
-    
-    finish_times = []
-    for key in results:
-        finish_times.extend(results[key])
-    finish_times.sort()
-    return finish_times
+        crane_processes.append(env.process(crane_unload(
+            env, containers_for_crane, unload_time_params, yard, vessel, current_container_id,
+            train_percentage, sim_config, container_categories
+        )))
+        current_container_id += containers_for_crane
+    yield simpy.events.AllOf(env, crane_processes)
