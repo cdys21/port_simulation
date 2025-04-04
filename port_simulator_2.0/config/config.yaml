@@ -1,0 +1,70 @@
+simulation:
+  duration: 150
+  seed: 42
+
+port:
+  berth_count: 4
+  gate_count: 120
+  yard_capacity: 50000
+  initial_yard_fill: 0.7
+
+processes:
+  vessel_arrival:
+    arrival_time_distribution: triangular
+    min_offset: -1
+    max_offset: 5
+    mode: 2
+  crane_unload:
+    unload_time_distribution: triangular
+    min: 0.01
+    max: 0.033
+    mode: 0.5
+  truck_departure:
+    process_time_distribution: triangular
+    min: 0.1
+    max: 0.3
+    mode: 0.13
+  train_departure:
+    loading_time: 2
+    capacity: 750
+
+container:
+  rail_adoption: 0.15
+
+vessels:
+  - name: 'CEZANNE'
+    container_count: 2642
+    day: 1
+    hour: 8
+  - name: 'CCNI ANDES'
+    container_count: 2338
+    day: 1
+    hour: 10
+  - name: 'CMA CGM LEO'
+    container_count: 2187
+    day: 1
+    hour: 14
+  - name: 'ONE REINFORCEMENT'
+    container_count: 1752
+    day: 1
+    hour: 15
+  - name: 'POLAR ECUADOR'
+    container_count: 1431
+    day: 1
+    hour: 16
+  - name: 'W KITHIRA'
+    container_count: 998
+    day: 2
+    hour: 8
+  - name: 'MAERSK ATHABASCA'
+    container_count: 996
+    day: 2
+    hour: 8
+  - name: 'MAERSK SENTOSA'
+    container_count: 892
+    day: 2
+    hour: 12
+  - name: 'SUAPE EXPRESS'
+    container_count: 1062
+    day: 2
+    hour: 15
