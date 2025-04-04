@@ -1,5 +1,12 @@
 # Port Simulation Project
 
+## TO-DO
+- [ ] Add progress bar
+- [ ] Add heatmap
+- [ ] Add better way to modify inputs
+- [ ] Add dwell time distribution
+- [ ] Add option to have multiple container types with their own yards.
+
 ## Overview
 
 This project simulates maritime port operations focused on the movement of import containers. The simulation models container arrival, unloading, and departures via road (truck) and rail (train), collecting metrics to analyze port performance.

@@ -6,13 +6,13 @@ from .models import Vessel, Container
 def vessel_arrival(env, vessel, berths, yard, all_containers, processes_config, gate_resource):
     """Process for vessel arrival, berthing, and unloading."""
     yield env.timeout(vessel.actual_arrival)
-    print(f"{vessel.name} arrives at {env.now:.2f}")
+    #print(f"{vessel.name} arrives at {env.now:.2f}")
     with berths.request() as req:
         yield req
         vessel.vessel_berths = env.now
         for container in vessel.containers:
             container.vessel_berths = env.now
-        print(f"{vessel.name} berths at {env.now:.2f}")
+        #print(f"{vessel.name} berths at {env.now:.2f}")
         crane_processes = []
         cranes = 4  # Number of cranes per berth
         containers_per_crane = vessel.container_count // cranes
@@ -25,7 +25,7 @@ def vessel_arrival(env, vessel, berths, yard, all_containers, processes_config, 
             proc = env.process(crane_unload(env, crane_containers, yard, all_containers, processes_config, gate_resource))
             crane_processes.append(proc)
         yield env.all_of(crane_processes)
-        print(f"{vessel.name} unloading complete at {env.now:.2f}")
+        #print(f"{vessel.name} unloading complete at {env.now:.2f}")
 
 def crane_unload(env, containers, yard, all_containers, processes_config, gate_resource):
     """Process for unloading containers with a crane."""
@@ -106,7 +106,7 @@ def train_departure_process(env, yard, gate_resource, all_containers, processes_
                 container.departed_port = env.now
                 yard.remove_container(container)
                 all_containers.append(container)
-            print(f"Train departed at {env.now:.2f} with {len(departing)} containers")
+            #print(f"Train departed at {env.now:.2f} with {len(departing)} containers")
 
 def monitor(env, yard, metrics):
     """Monitor yard occupancy and queue lengths."""
@@ -127,4 +127,5 @@ def monitor(env, yard, metrics):
         metrics['gate_status'].append((env.now, gate_status))
         if env.now % 12 < 1:
             print(f"Time: {env.now:.2f} | Yard: {occupancy} | Truck Queue: {truck_waiting} | Rail Queue: {rail_waiting} | Gates: {gate_status}")
+            pass
         yield env.timeout(1)

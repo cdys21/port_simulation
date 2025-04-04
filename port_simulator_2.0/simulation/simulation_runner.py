@@ -27,7 +27,7 @@ def initial_departure_trigger(env, yard, gate_resource, all_containers, processe
     """
     while True:
         yield env.timeout(check_interval)
-        print(f"[DEBUG] initial_departure_trigger checking at time {env.now:.2f}")
+        #print(f"[DEBUG] initial_departure_trigger checking at time {env.now:.2f}")
         # Iterate over a copy of the container list to avoid modification issues.
         for container in list(yard.containers):
             if container.vessel == "Initial" and container.departed_port is None:
@@ -113,20 +113,20 @@ def run_simulation(config):
             arrival_params,
             rail_adoption
         )
-        #print(f"[DEBUG] Scheduling arrival for vessel {vessel.name} at time {vessel.actual_arrival:.2f}")
+        print(f"[DEBUG] Scheduling arrival for vessel {vessel.name} at time {vessel.actual_arrival:.2f}")
         env.process(vessel_arrival(env, vessel, berths, yard, all_containers, processes_config, gate_resource))
 
     # Run the simulation
     duration = config.get('simulation', {}).get('duration', 150)
-    #print(f"[DEBUG] Running simulation until time {duration}")
+    print(f"[DEBUG] Running simulation until time {duration}")
     env.run(until=duration)
 
     df = create_dataframe(all_containers)
-    #print("\nSIMULATION SUMMARY:")
-    #print(f"Number of containers processed: {len(all_containers)}")
+    print("\nSIMULATION SUMMARY:")
+    print(f"Number of containers processed: {len(all_containers)}")
     road_containers = sum(1 for c in all_containers if c.mode == "Road")
     rail_containers = sum(1 for c in all_containers if c.mode == "Rail")
-    #print(f"Containers by mode: Road {road_containers}, Rail {rail_containers}")
+    print(f"Containers by mode: Road {road_containers}, Rail {rail_containers}")
 
     return df, metrics
 
