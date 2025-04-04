@@ -6,14 +6,6 @@ port:
   berth_count: 4
   gate_count: 120
   yard_capacity: 50000
-  initial_yard_fill: 0.1
-
-initial_container:
-  waiting_time:
-    distribution: triangular
-    min: 0
-    max: 5
-    mode: 0
 
 processes:
   vessel_arrival:

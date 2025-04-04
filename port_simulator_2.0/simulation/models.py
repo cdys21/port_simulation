@@ -34,16 +34,12 @@ class Vessel:
             self.containers.append(container)
 
 class Yard:
-    """Manages container storage with capacity constraints."""
-    def __init__(self, capacity, initial_count, rail_adoption):
+    """Manages container storage with capacity constraints.
+    Now starts empty; containers will be added only via vessel arrivals.
+    """
+    def __init__(self, capacity):
         self.capacity = capacity
-        self.containers = []
-        # Pre-populate the yard with initial containers
-        for _ in range(initial_count):
-            container = Container("Initial", None, None,
-                                  random.choices(['Rail', 'Road'], weights=[rail_adoption, 1 - rail_adoption])[0])
-            container.entered_yard = 0
-            self.containers.append(container)
+        self.containers = []  # Start empty
 
     def add_container(self, container):
         if len(self.containers) >= self.capacity:
