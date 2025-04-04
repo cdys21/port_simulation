@@ -1,4 +1,3 @@
-# simulation/simulation_runner.py
 import random
 import simpy
 import yaml
@@ -8,13 +7,13 @@ from .metrics import create_dataframe
 
 def run_simulation(config):
     env = simpy.Environment()
-    # Create berth and gate resources.
-    berths = simpy.Resource(env, capacity=config['berth_count'])
+    # Create berth and gate resources using keys under "port"
+    berths = simpy.Resource(env, capacity=config['port']['berth_count'])
     global gates
-    gates = simpy.Resource(env, capacity=config.get('gate_count', 120))
+    gates = simpy.Resource(env, capacity=config['port']['gate_count'])
     
-    # Initialize the yard as empty.
-    yard = Yard(capacity=config.get('yard_capacity', 50000))
+    # Initialize the yard as empty using yard_capacity from config
+    yard = Yard(capacity=config['port']['yard_capacity'])
     
     metrics = {
         'yard_occupancy': [],
@@ -42,10 +41,9 @@ def run_simulation(config):
         )
         env.process(vessel_arrival(env, vessel, berths, yard, all_containers, config.get('processes', {}), gates))
     
-    # (No initial container processing is done here, as the yard now starts empty.)
-    
     # Run the simulation until the configured duration.
-    env.run(until=config.get('simulation_duration', 48))
+    duration = config['simulation']['duration']  # now using simulation.duration key
+    env.run(until=duration)
     
     df = create_dataframe(all_containers)
     print("\nSIMULATION SUMMARY:")

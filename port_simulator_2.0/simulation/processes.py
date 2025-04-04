@@ -1,4 +1,3 @@
-# simulation/processes.py
 import random
 import simpy
 from .models import Vessel, Container
@@ -94,3 +93,24 @@ def train_departure_process(env, yard, gate_resource, all_containers, processes_
                 container.departed_port = env.now
                 yard.remove_container(container)
                 all_containers.append(container)
+
+def monitor(env, yard, metrics):
+    """Monitor yard occupancy and queue lengths."""
+    while True:
+        occupancy = len(yard.containers)
+        truck_waiting = len([
+            c for c in yard.containers
+            if c.mode == "Road" and c.waiting_for_inland_tsp is not None and c.departed_port is None
+        ])
+        rail_waiting = len([
+            c for c in yard.containers
+            if c.mode == "Rail" and c.waiting_for_inland_tsp is not None and c.departed_port is None
+        ])
+        gate_status = "Open" if is_gate_open(env.now) else "Closed"
+        metrics['yard_occupancy'].append((env.now, occupancy))
+        metrics['truck_queue'].append((env.now, truck_waiting))
+        metrics['rail_queue'].append((env.now, rail_waiting))
+        metrics['gate_status'].append((env.now, gate_status))
+        if env.now % 12 < 1:
+            print(f"Time: {env.now:.2f} | Yard: {occupancy} | Truck Queue: {truck_waiting} | Rail Queue: {rail_waiting} | Gates: {gate_status}")
+        yield env.timeout(1)
