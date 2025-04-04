@@ -59,7 +59,10 @@ def next_gate_opening(current_time):
 
 def container_departure(env, container, yard, gate_resource, all_containers, processes_config):
     """Process for container departure using road (truck) logic."""
-    container.waiting_for_inland_tsp = env.now
+    # Only set waiting_for_inland_tsp if it hasn't been set already
+    if container.waiting_for_inland_tsp is None:
+        container.waiting_for_inland_tsp = env.now
+
     if container.mode == "Road":
         if not is_gate_open(env.now):
             next_open = next_gate_opening(env.now)
@@ -82,9 +85,6 @@ def container_departure(env, container, yard, gate_resource, all_containers, pro
                 all_containers.append(container)
             else:
                 env.process(container_departure(env, container, yard, gate_resource, all_containers, processes_config))
-    elif container.mode == "Rail":
-        # Rail departure is managed by the train departure process.
-        pass
 
 def train_departure_process(env, yard, gate_resource, all_containers, processes_config):
     """Process for train departures every 6 hours."""
