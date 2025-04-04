@@ -5,7 +5,7 @@
 This project simulates maritime port operations focused on the movement of import containers. The simulation models container arrival, unloading, and departures via road (truck) and rail (train), collecting metrics to analyze port performance.
 
 ## Directory Structure
-```
+```bash
 port_simulation/
 ├── config/
 │   └── config.yaml         # All simulation parameters and distribution settings
@@ -82,3 +82,5 @@ Execute the main script:
 ```bash
 python main.py
 ```
+
+# Q&A

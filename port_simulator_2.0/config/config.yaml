@@ -1,5 +1,5 @@
 simulation:
-  duration: 150
+  duration: 500
   seed: 42
 
 port:
@@ -26,7 +26,7 @@ processes:
     mode: 0.13
   train_departure:
     loading_time: 2
-    capacity: 750
+    capacity: 500
 
 container:
   rail_adoption: 0.15
