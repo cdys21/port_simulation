@@ -1,0 +1,59 @@
+{
+    "general": {
+        "berth_count": 4,
+        "gate_count": 120,
+        "yard_capacity": {"value": 50000, "unit": "containers"},
+        "initial_yard_fill": 0.7,  // Fraction (0–1), unitless
+        "simulation_duration": {"value": 150, "unit": "hours"},
+        "rail_adoption": 0.15,  // Probability (0–1), unitless
+        "save_csv": true,
+        "output_file": "container_checkpoints.csv"
+    },
+    "vessels": {
+        "schedule": [
+            {"name": "CEZANNE", "container_count": 2642, "day": 1, "hour": 8},
+            {"name": "CCNI ANDES", "container_count": 2338, "day": 1, "hour": 10},
+            {"name": "CMA CGM LEO", "container_count": 2187, "day": 1, "hour": 14},
+            {"name": "ONE REINFORCEMENT", "container_count": 1752, "day": 1, "hour": 15},
+            {"name": "POLAR ECUADOR", "container_count": 1431, "day": 1, "hour": 16},
+            {"name": "W KITHIRA", "container_count": 998, "day": 2, "hour": 8},
+            {"name": "MAERSK ATHABASCA", "container_count": 996, "day": 2, "hour": 8},
+            {"name": "MAERSK SENTOSA", "container_count": 892, "day": 2, "hour": 12},
+            {"name": "SUAPE EXPRESS", "container_count": 1062, "day": 2, "hour": 15}
+        ],
+        "arrival_delay_distribution": {
+            "type": "triangular",
+            "low": {"value": -1, "unit": "hours"},
+            "high": {"value": 5, "unit": "hours"},
+            "mode": {"value": 2, "unit": "hours"}
+        },
+        "cranes_per_berth": 4,
+        "unload_time_distribution": {
+            "type": "triangular",
+            "low": {"value": 0.01, "unit": "hours"},
+            "high": {"value": 0.033, "unit": "hours"},
+            "mode": {"value": 0.5, "unit": "hours"}
+        }
+    },
+    "road_transport": {
+        "gate_open_hours": {
+            "start": {"value": 6, "unit": "hours"},  // 6 AM in 24-hour clock
+            "end": {"value": 17, "unit": "hours"}    // 5 PM in 24-hour clock
+        },
+        "truck_process_time_distribution": {
+            "type": "triangular",
+            "low": {"value": 0.1, "unit": "hours"},
+            "high": {"value": 0.3, "unit": "hours"},
+            "mode": {"value": 0.13, "unit": "hours"}
+        }
+    },
+    "rail_transport": {
+        "train_departure_interval": {"value": 6, "unit": "hours"},
+        "train_capacity": {"value": 750, "unit": "containers"},
+        "train_loading_time": {"value": 2, "unit": "hours"}
+    },
+    "monitoring": {
+        "monitor_interval": {"value": 1, "unit": "hours"},
+        "report_interval": {"value": 12, "unit": "hours"}
+    }
+}
