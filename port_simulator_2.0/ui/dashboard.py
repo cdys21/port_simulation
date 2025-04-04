@@ -78,32 +78,47 @@ def plot_queue(df_queue, queue_type):
 
 def plot_cumulative_departures(df):
     """
-    Create a separate Plotly plot for cumulative departures by Road and Rail.
+    Create a Plotly plot for cumulative departures over time.
+    This function aggregates all Road departures (initial and vessel) together,
+    and similarly for Rail departures.
     """
-    # Filter containers that have departed
+    # Filter containers that have departed for Road and Rail
     road_departures = df[(df['mode'] == "Road") & (df['departed_port'].notnull())].copy()
     rail_departures = df[(df['mode'] == "Rail") & (df['departed_port'].notnull())].copy()
     
     fig = go.Figure()
     
+    # Road departures cumulative curve
     if not road_departures.empty:
         road_departures = road_departures.sort_values("departed_port")
         road_times = road_departures['departed_port'].tolist()
-        road_counts = list(range(1, len(road_times)+1))
-        fig.add_trace(go.Scatter(x=road_times, y=road_counts, mode='lines',
-                                 name='Cumul Departures by ROAD'))
+        road_counts = list(range(1, len(road_times) + 1))
+        fig.add_trace(go.Scatter(
+            x=road_times,
+            y=road_counts,
+            mode='lines',
+            name='Cumul Departures by ROAD'
+        ))
     
+    # Rail departures cumulative curve
     if not rail_departures.empty:
         rail_departures = rail_departures.sort_values("departed_port")
         rail_times = rail_departures['departed_port'].tolist()
-        rail_counts = list(range(1, len(rail_times)+1))
-        fig.add_trace(go.Scatter(x=rail_times, y=rail_counts, mode='lines',
-                                 name='Cumul Departures by RAIL'))
+        rail_counts = list(range(1, len(rail_times) + 1))
+        fig.add_trace(go.Scatter(
+            x=rail_times,
+            y=rail_counts,
+            mode='lines',
+            name='Cumul Departures by RAIL'
+        ))
     
-    fig.update_layout(title="Cumulative Departures Over Time",
-                      xaxis_title="Time (hrs)",
-                      yaxis_title="Cumulative Count")
+    fig.update_layout(
+        title="Cumulative Departures Over Time",
+        xaxis_title="Time (hrs)",
+        yaxis_title="Cumulative Count"
+    )
     return fig
+
 
 def plot_dwell_boxplots(df):
     # Filter non-initial containers and compute durations

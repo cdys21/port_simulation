@@ -58,33 +58,41 @@ def next_gate_opening(current_time):
         return current_time
 
 def container_departure(env, container, yard, gate_resource, all_containers, processes_config):
-    """Process for container departure using road (truck) logic."""
-    # Only set waiting_for_inland_tsp if it hasn't been set already
+    """New truck departure logic for Road containers.
+    
+    Steps:
+    1. If waiting_for_inland_tsp is not set, set it to env.now.
+    2. Wait until the gate is open.
+    3. Request the gate resource.
+    4. Once the resource is acquired, simulate truck loading.
+    5. Mark container departure and remove it from the yard.
+    """
+    # Set waiting time if not already set.
     if container.waiting_for_inland_tsp is None:
         container.waiting_for_inland_tsp = env.now
 
-    if container.mode == "Road":
-        if not is_gate_open(env.now):
-            next_open = next_gate_opening(env.now)
-            yield env.timeout(next_open - env.now)
-        with gate_resource.request() as req:
-            yield req
-            if not is_gate_open(env.now):
-                env.process(container_departure(env, container, yard, gate_resource, all_containers, processes_config))
-                return
-            container.loaded_for_transport = env.now
-            truck_params = processes_config.get('truck_departure', {})
-            min_time = truck_params.get('min', 0.1)
-            max_time = truck_params.get('max', 0.3)
-            mode_time = truck_params.get('mode', 0.13)
-            process_time = random.triangular(min_time, max_time, mode_time)
-            yield env.timeout(process_time)
-            if is_gate_open(env.now):
-                container.departed_port = env.now
-                yard.remove_container(container)
-                all_containers.append(container)
-            else:
-                env.process(container_departure(env, container, yard, gate_resource, all_containers, processes_config))
+    # Wait until gate is open.
+    while not is_gate_open(env.now):
+        # Calculate time until next opening and wait.
+        yield env.timeout(next_gate_opening(env.now) - env.now)
+
+    # Now that the gate is open, request the gate resource.
+    with gate_resource.request() as req:
+        yield req
+        # Once the resource is acquired, perform truck loading.
+        truck_params = processes_config.get('truck_departure', {})
+        min_time = truck_params.get('min', 0.1)
+        max_time = truck_params.get('max', 0.3)
+        mode_time = truck_params.get('mode', 0.13)
+        process_time = random.triangular(min_time, max_time, mode_time)
+        yield env.timeout(process_time)
+        
+        # Mark the container as departed.
+        container.departed_port = env.now
+        yard.remove_container(container)
+        all_containers.append(container)
+
+
 
 def train_departure_process(env, yard, gate_resource, all_containers, processes_config):
     """Process for train departures every 6 hours."""
