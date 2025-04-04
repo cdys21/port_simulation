@@ -45,17 +45,24 @@ def compute_key_stats(df, yard_df, truck_df, rail_df):
     }
 
 def plot_yard_occupancy(yard_df, df):
+    """
+    Create a Plotly plot of yard occupancy over time with vertical dashed lines for vessel arrivals.
+    """
     fig = go.Figure()
+
+    # Yard occupancy trace
     fig.add_trace(go.Scatter(x=yard_df['time'], y=yard_df['occupancy'],
                              mode='lines',
                              name='Yard Occupancy'))
-    # For vessel arrivals, get non-initial containers, group by vessel and get min vessel_arrives
+    
+    # Vessel arrivals (non-initial) vertical lines
     df_vessels = df[df['vessel'] != "Initial"].dropna(subset=['vessel_arrives'])
     if not df_vessels.empty:
         vessel_arrivals = df_vessels.groupby("vessel")["vessel_arrives"].min().reset_index()
         for idx, row in vessel_arrivals.iterrows():
             fig.add_vline(x=row["vessel_arrives"], line_width=1, line_dash="dash", line_color="green",
                           annotation_text=row["vessel"], annotation_position="top right")
+    
     fig.update_layout(title="Yard Occupancy Over Time",
                       xaxis_title="Time (hrs)",
                       yaxis_title="Occupancy")
@@ -67,6 +74,35 @@ def plot_queue(df_queue, queue_type):
     fig = px.line(df_queue, x="time", y=y_col,
                   title=f"{queue_type} Queue Over Time",
                   labels={"time": "Time (hrs)", y_col: f"{queue_type} Queue Length"})
+    return fig
+
+def plot_cumulative_departures(df):
+    """
+    Create a separate Plotly plot for cumulative departures by Road and Rail.
+    """
+    # Filter containers that have departed
+    road_departures = df[(df['mode'] == "Road") & (df['departed_port'].notnull())].copy()
+    rail_departures = df[(df['mode'] == "Rail") & (df['departed_port'].notnull())].copy()
+    
+    fig = go.Figure()
+    
+    if not road_departures.empty:
+        road_departures = road_departures.sort_values("departed_port")
+        road_times = road_departures['departed_port'].tolist()
+        road_counts = list(range(1, len(road_times)+1))
+        fig.add_trace(go.Scatter(x=road_times, y=road_counts, mode='lines',
+                                 name='Cumul Departures by ROAD'))
+    
+    if not rail_departures.empty:
+        rail_departures = rail_departures.sort_values("departed_port")
+        rail_times = rail_departures['departed_port'].tolist()
+        rail_counts = list(range(1, len(rail_times)+1))
+        fig.add_trace(go.Scatter(x=rail_times, y=rail_counts, mode='lines',
+                                 name='Cumul Departures by RAIL'))
+    
+    fig.update_layout(title="Cumulative Departures Over Time",
+                      xaxis_title="Time (hrs)",
+                      yaxis_title="Cumulative Count")
     return fig
 
 def plot_dwell_boxplots(df):
@@ -81,7 +117,6 @@ def plot_dwell_boxplots(df):
     df_non_initial["time_in_yard_waiting"] = df_non_initial['departed_port'] - df_non_initial['entered_yard']
     df_non_initial["total_duration"] = df_non_initial['departed_port'] - df_non_initial['vessel_scheduled_arrival']
     
-    # Prepare boxplot data
     fig = go.Figure()
     for col, name in zip(["vessel_arrival_uncertainty", "berth_delay", "unloading_time", "time_in_yard_waiting", "total_duration"],
                          ["Vessel Arrival Uncertainty", "Berth Delay", "Unloading Time", "Time in Yard Waiting", "Total Duration"]):
@@ -121,10 +156,10 @@ def main():
         # Display key stats at the top in a structured layout
         st.subheader("Key Statistics")
         col1, col2, col3 = st.columns(3)
-        col1.metric("Avg Dwell Time (days)", f"{stats['Avg Dwell Time (hrs)']/24:.2f}" if stats['Avg Dwell Time (hrs)'] is not None else "N/A")
-        col1.metric("Avg Unloading Time (days)", f"{stats['Avg Unloading Time (hrs)']/24:.2f}" if stats['Avg Unloading Time (hrs)'] is not None else "N/A")
-        col2.metric("Avg Dwell Time - Road (days)", f"{stats['Avg Dwell Time - Road (hrs)']/24:.2f}" if stats['Avg Dwell Time - Road (hrs)'] is not None else "N/A")
-        col2.metric("Avg Dwell Time - Rail (days)", f"{stats['Avg Dwell Time - Rail (hrs)']/24:.2f}" if stats['Avg Dwell Time - Rail (hrs)'] is not None else "N/A")
+        col1.metric("Avg Dwell Time (hrs)", f"{stats['Avg Dwell Time (hrs)']:.2f}" if stats['Avg Dwell Time (hrs)'] is not None else "N/A")
+        col1.metric("Avg Unloading Time (hrs)", f"{stats['Avg Unloading Time (hrs)']:.2f}" if stats['Avg Unloading Time (hrs)'] is not None else "N/A")
+        col2.metric("Avg Dwell Time - Road (hrs)", f"{stats['Avg Dwell Time - Road (hrs)']:.2f}" if stats['Avg Dwell Time - Road (hrs)'] is not None else "N/A")
+        col2.metric("Avg Dwell Time - Rail (hrs)", f"{stats['Avg Dwell Time - Rail (hrs)']:.2f}" if stats['Avg Dwell Time - Rail (hrs)'] is not None else "N/A")
         col3.metric("Max Yard Occupancy", f"{stats['Max Yard Occupancy']:.0f}" if stats['Max Yard Occupancy'] is not None else "N/A")
         col3.metric("Vessels Unloaded", f"{stats['Vessels Unloaded']}")
         st.markdown("---")
@@ -141,6 +176,11 @@ def main():
         st.subheader("Yard Occupancy Over Time")
         fig_yard = plot_yard_occupancy(yard_df, df)
         st.plotly_chart(fig_yard, use_container_width=True)
+
+        # New Plot: Cumulative Departures by ROAD and RAIL
+        st.subheader("Cumulative Departures Over Time")
+        fig_cumul = plot_cumulative_departures(df)
+        st.plotly_chart(fig_cumul, use_container_width=True)
 
         # Plot truck queue over time
         st.subheader("Truck Queue Over Time")

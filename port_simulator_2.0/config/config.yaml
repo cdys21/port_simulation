@@ -42,7 +42,7 @@ vessels:
   - name: 'CEZANNE'
     container_count: 2642
     day: 1
-    hour: 8
+    hour: 7
   - name: 'CCNI ANDES'
     container_count: 2338
     day: 1
