@@ -5,47 +5,16 @@ import plotly.express as px
 from simulation_processes import run_simulation
 from config import default_config
 
+# Use entire screen layout.
+st.set_page_config(layout="wide")
+
 # Define presets (you can expand these as needed)
 presets = {
-    "Default": default_config,
-    "High Throughput": {
-        "berth_count": 6,
-        "gate_count": 150,
-        "simulation_duration": 200,
-        "save_csv": False,
-        "output_file": "container_checkpoints.csv",
-        "container_types": [
-            {
-                "name": "Standard",
-                "yard_capacity": 40000,
-                "initial_yard_fill": 0.5,
-                "rail_percentage": 0.20,
-                "unload_time": [0.008, 0.03, 0.015],
-                "truck_process_time": [0.08, 0.25, 0.1]
-            },
-            {
-                "name": "Reefer",
-                "yard_capacity": 15000,
-                "initial_yard_fill": 0.4,
-                "rail_percentage": 0.25,
-                "unload_time": [0.015, 0.035, 0.02],
-                "truck_process_time": [0.12, 0.3, 0.18]
-            },
-            {
-                "name": "Hazardous",
-                "yard_capacity": 6000,
-                "initial_yard_fill": 0.35,
-                "rail_percentage": 0.10,
-                "unload_time": [0.012, 0.045, 0.025],
-                "truck_process_time": [0.18, 0.4, 0.28]
-            }
-        ],
-        "vessels": default_config["vessels"]
-    },
-    "Energy Saving": {
+    "APM Terminal NYNJ": default_config,
+    "YLK Rail Heavy": {
         "berth_count": 3,
         "gate_count": 100,
-        "simulation_duration": 150,
+        "simulation_duration": 200,
         "save_csv": False,
         "output_file": "container_checkpoints.csv",
         "container_types": [
@@ -53,7 +22,7 @@ presets = {
                 "name": "Standard",
                 "yard_capacity": 25000,
                 "initial_yard_fill": 0.7,
-                "rail_percentage": 0.10,
+                "rail_percentage": 0.30,
                 "unload_time": [0.012, 0.036, 0.02],
                 "truck_process_time": [0.12, 0.35, 0.15]
             },
@@ -61,7 +30,7 @@ presets = {
                 "name": "Reefer",
                 "yard_capacity": 8000,
                 "initial_yard_fill": 0.6,
-                "rail_percentage": 0.15,
+                "rail_percentage": 0.0,
                 "unload_time": [0.025, 0.045, 0.03],
                 "truck_process_time": [0.18, 0.4, 0.25]
             },
@@ -69,7 +38,7 @@ presets = {
                 "name": "Hazardous",
                 "yard_capacity": 4000,
                 "initial_yard_fill": 0.5,
-                "rail_percentage": 0.05,
+                "rail_percentage": 0.10,
                 "unload_time": [0.018, 0.05, 0.03],
                 "truck_process_time": [0.25, 0.45, 0.35]
             }
@@ -131,7 +100,6 @@ for i, vessel in enumerate(preset_config["vessels"]):
         container_counts = {}
         st.markdown("**Container Counts:**")
         for ct in container_types:
-            # Use the preset vessel container count if available; otherwise default to 0.
             default_count = vessel.get("container_counts", {}).get(ct["name"], 0)
             count = st.number_input(f"{ct['name']}", value=default_count, min_value=0, key=f"{vessel_name}_{ct['name']}")
             container_counts[ct["name"]] = count
@@ -164,68 +132,123 @@ if st.button("Run Simulation"):
     df, metrics, yard_metrics = run_simulation(config, progress_callback=update_progress)
     st.write("Simulation complete!")
     
-    st.subheader("Data Summary")
-    st.write(df[df.vessel!="Initial"].head())
+    # ---------------------
+    # Visualizations Area
+    # ---------------------
     
-    # 1. Total Yard Occupancy Over Time
-    occ_data = pd.DataFrame(metrics["yard_occupancy"], columns=["Time", "Occupancy"])
-    fig1 = px.line(occ_data, x="Time", y="Occupancy",
-                   title="Total Yard Occupancy Over Time",
-                   labels={"Time": "Time (hours)", "Occupancy": "Total Occupancy"})
-    st.plotly_chart(fig1, use_container_width=True)
+    # Checkpoint Distributions in a Single Plot (Horizontal Boxplot) with Container Type Colors
+    with st.expander("Checkpoints", expanded=True):
+        df_cp = df[df.vessel != "Initial"].copy()
+        df_cp["arrival_delay"] = df_cp["vessel_arrives"] - df_cp["vessel_scheduled_arrival"]
+        df_cp["berth_queue"] = df_cp["vessel_berths"] - df_cp["vessel_arrives"]
+        df_cp["unloading_time"] = df_cp["entered_yard"] - df_cp["vessel_berths"]
+        df_cp["yard_waiting_time"] = df_cp["waiting_for_inland_tsp"] - df_cp["entered_yard"]
+        df_cp["loading_queue"] = df_cp["loaded_for_transport"] - df_cp["waiting_for_inland_tsp"]
+        df_cp["loading_time"] = df_cp["departed_port"] - df_cp["loaded_for_transport"]
+        df_cp["total_dwell_time"] = df_cp["departed_port"] - df_cp["vessel_scheduled_arrival"]
+
+        # Melt the checkpoint columns into a single DataFrame for plotting
+        checkpoint_df = df_cp.melt(
+            id_vars=["vessel", "container_type", "mode"],
+            value_vars=["arrival_delay", "berth_queue", "unloading_time", "yard_waiting_time", "loading_queue", "loading_time", "total_dwell_time"],
+            var_name="Checkpoint",
+            value_name="Time"
+        )
+
+        # Define the desired order of checkpoints
+        checkpoint_order = ["arrival_delay", "berth_queue", "unloading_time", "yard_waiting_time", "loading_queue", "loading_time", "total_dwell_time"]
+        
+        # 1. Figure for All Containers (No additional color grouping)
+        st.subheader("Checkpoint Distributions for All Containers")
+        fig_all = px.box(
+            checkpoint_df,
+            x="Time",
+            y="Checkpoint",
+            orientation='h',
+            category_orders={"Checkpoint": checkpoint_order},
+            title="Checkpoint Distributions (All Containers)",
+            labels={"Time": "Time (hours)", "Checkpoint": "Checkpoint"}
+        )
+        st.plotly_chart(fig_all, use_container_width=True)
+
+        # 2. Figure with Container Types as Color
+        st.subheader("Checkpoint Distributions Colored by Container Type")
+        fig_cp_by_type = px.box(
+            checkpoint_df,
+            x="Time",
+            y="Checkpoint",
+            orientation='h',
+            color="container_type",  # Color by container type
+            category_orders={"Checkpoint": checkpoint_order},
+            title="Checkpoint Distributions by Container Type",
+            labels={"Time": "Time (hours)", "Checkpoint": "Checkpoint", "container_type": "Container Type"}
+        )
+        st.plotly_chart(fig_cp_by_type, use_container_width=True)
+
+        # 3. Figure with Transportation Modes as Color
+        st.subheader("Checkpoint Distributions Colored by Transportation Mode")
+        fig_cp_by_mode = px.box(
+            checkpoint_df,
+            x="Time",
+            y="Checkpoint",
+            orientation='h',
+            color="mode",  # Color by transportation mode
+            category_orders={"Checkpoint": checkpoint_order},
+            title="Checkpoint Distributions by Transportation Mode",
+            labels={"Time": "Time (hours)", "Checkpoint": "Checkpoint", "mode": "Mode"}
+        )
+        st.plotly_chart(fig_cp_by_mode, use_container_width=True)
     
-    # 2. Yard Occupancy Per Container Category Over Time with Capacity Lines
-    fig2 = px.line()
-    for ct in config["container_types"]:
-        cat = ct["name"]
-        data = pd.DataFrame(yard_metrics[cat], columns=["Time", "Occupancy"])
-        fig2.add_scatter(x=data["Time"], y=data["Occupancy"], mode="lines", name=f"{cat} Occupancy")
-        fig2.add_hline(y=ct["yard_capacity"], line_dash="dash", annotation_text=f"{cat} Capacity")
-    fig2.update_layout(title="Yard Occupancy per Container Category Over Time",
-                       xaxis_title="Time (hours)",
-                       yaxis_title="Occupancy")
-    st.plotly_chart(fig2, use_container_width=True)
+    # Yard Occupancy Visuals
+    with st.expander("Yard Occupancy", expanded=False):
+        st.subheader("Total Yard Occupancy Over Time")
+        occ_data = pd.DataFrame(metrics["yard_occupancy"], columns=["Time", "Occupancy"])
+        fig1 = px.line(occ_data, x="Time", y="Occupancy",
+                       title="Total Yard Occupancy Over Time",
+                       labels={"Time": "Time (hours)", "Occupancy": "Total Occupancy"})
+        st.plotly_chart(fig1, use_container_width=True)
+        
+        st.subheader("Yard Occupancy per Container Category")
+        fig2 = px.line()
+        for ct in config["container_types"]:
+            cat = ct["name"]
+            data = pd.DataFrame(yard_metrics[cat], columns=["Time", "Occupancy"])
+            fig2.add_scatter(x=data["Time"], y=data["Occupancy"], mode="lines", name=f"{cat} Occupancy")
+            fig2.add_hline(y=ct["yard_capacity"], line_dash="dash", annotation_text=f"{cat} Capacity")
+        fig2.update_layout(title="Yard Occupancy per Container Category Over Time",
+                           xaxis_title="Time (hours)",
+                           yaxis_title="Occupancy")
+        st.plotly_chart(fig2, use_container_width=True)
     
-    # 3. Cumulative Unloaded Containers Over Time per Container Type
-    unload_df = pd.DataFrame(metrics["cumulative_unloaded"], columns=["Time", "Container_Type"])
-    unload_df["Cumulative"] = unload_df.groupby("Container_Type").cumcount() + 1
-    fig3 = px.line(unload_df, x="Time", y="Cumulative", color="Container_Type",
-                   title="Cumulative Unloaded Containers Over Time",
-                   labels={"Time": "Time (hours)", "Cumulative": "Cumulative Unloaded"})
-    st.plotly_chart(fig3, use_container_width=True)
+    # Unloading Visuals
+    with st.expander("Unloading", expanded=False):
+        st.subheader("Cumulative Unloaded Containers Over Time")
+        unload_df = pd.DataFrame(metrics["cumulative_unloaded"], columns=["Time", "Container_Type"])
+        unload_df["Cumulative"] = unload_df.groupby("Container_Type").cumcount() + 1
+        fig3 = px.line(unload_df, x="Time", y="Cumulative", color="Container_Type",
+                       title="Cumulative Unloaded Containers Over Time",
+                       labels={"Time": "Time (hours)", "Cumulative": "Cumulative Unloaded"})
+        st.plotly_chart(fig3, use_container_width=True)
     
-    # 4. Cumulative Departures Over Time per Mode
-    dep_df = pd.DataFrame(metrics["cumulative_departures"], columns=["Time", "Mode", "Container_Type"])
-    dep_df["Cumulative"] = dep_df.groupby("Mode").cumcount() + 1
-    fig4 = px.line(dep_df, x="Time", y="Cumulative", color="Mode",
-                   title="Cumulative Departures Over Time by Mode",
-                   labels={"Time": "Time (hours)", "Cumulative": "Cumulative Departures"})
-    st.plotly_chart(fig4, use_container_width=True)
+    # Departures Visuals
+    with st.expander("Departures", expanded=False):
+        st.subheader("Cumulative Departures Over Time by Mode")
+        dep_df = pd.DataFrame(metrics["cumulative_departures"], columns=["Time", "Mode", "Container_Type"])
+        dep_df["Cumulative"] = dep_df.groupby("Mode").cumcount() + 1
+        fig4 = px.line(dep_df, x="Time", y="Cumulative", color="Mode",
+                       title="Cumulative Departures Over Time by Mode",
+                       labels={"Time": "Time (hours)", "Cumulative": "Cumulative Departures"})
+        st.plotly_chart(fig4, use_container_width=True)
+        
+        st.subheader("Cumulative Departures Over Time per Container Type")
+        dep_df["Cumulative_Type"] = dep_df.groupby("Container_Type").cumcount() + 1
+        fig5 = px.line(dep_df, x="Time", y="Cumulative_Type", color="Container_Type",
+                       title="Cumulative Departures Over Time per Container Type",
+                       labels={"Time": "Time (hours)", "Cumulative_Type": "Cumulative Departures"})
+        st.plotly_chart(fig5, use_container_width=True)
     
-    # 5. Cumulative Departures Over Time per Container Type
-    dep_df["Cumulative_Type"] = dep_df.groupby("Container_Type").cumcount() + 1
-    fig5 = px.line(dep_df, x="Time", y="Cumulative_Type", color="Container_Type",
-                   title="Cumulative Departures Over Time per Container Type",
-                   labels={"Time": "Time (hours)", "Cumulative_Type": "Cumulative Departures"})
-    st.plotly_chart(fig5, use_container_width=True)
-    
-    # 6. Overall Dwell Time Distribution (Boxplot)
-    df_clean = df[df.vessel!="Initial"]
-    df_clean["Dwell_Time"] = (df_clean["departed_port"] - df_clean["entered_yard"])/60
-    fig6 = px.box(df_clean, y="Dwell_Time", title="Overall Dwell Time Distribution",
-                  labels={"Dwell_Time": "Dwell Time (days)"})
-    st.plotly_chart(fig6, use_container_width=True)
-    
-    # 7. Dwell Time Distribution per Container Type
-    fig7 = px.box(df_clean, x="container_type", y="Dwell_Time",
-                  title="Dwell Time Distribution per Container Type",
-                  labels={"container_type": "Container Type", "Dwell_Time": "Dwell Time (days)"})
-    st.plotly_chart(fig7, use_container_width=True)
-    
-    # 8. Dwell Time Distribution per Transportation Mode
-    fig8 = px.box(df_clean, x="mode", y="Dwell_Time",
-                  title="Dwell Time Distribution per Transportation Mode",
-                  labels={"mode": "Transportation Mode", "Dwell_Time": "Dwell Time (days)"})
-    st.plotly_chart(fig8, use_container_width=True)
-    
+    with st.expander("Container-Level data (dataset)", expanded=False):
+        st.subheader("Data Summary")
+        st.write(df[df.vessel != "Initial"].head())
+        
     st.success("All plots generated.")
