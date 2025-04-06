@@ -20,11 +20,11 @@ presets = {
         "container_types": [
             {
                 "name": "Standard",
-                "yard_capacity": 30000,
-                "initial_yard_fill": 0.6,
-                "rail_percentage": 0.15,
-                "unload_time": [0.01, 0.033, 0.02],
-                "truck_process_time": [0.1, 0.3, 0.13],
+                "yard_capacity": 25000,
+                "initial_yard_fill": 0.7,
+                "rail_percentage": 0.30,
+                "unload_time": [0.012, 0.036, 0.02],
+                "truck_process_time": [0.12, 0.35, 0.15],
                 "max_stacking": 5,
                 "base_positioning_time": 0.05,
                 "positioning_penalty": 0.02,
@@ -96,13 +96,27 @@ for ct in preset_config["container_types"]:
         truck_high = st.number_input(f"{ct['name']} Truck Process Time High", value=ct["truck_process_time"][1], format="%.3f")
         truck_mode = st.number_input(f"{ct['name']} Truck Process Time Mode", value=ct["truck_process_time"][2], format="%.3f")
         
+        # New stacking parameters
+        max_stacking = st.number_input(f"{ct['name']} Maximum Stacking", value=ct.get("max_stacking", 5), min_value=1)
+        base_positioning_time = st.number_input(f"{ct['name']} Base Positioning Time", value=ct.get("base_positioning_time", 0.05), format="%.3f")
+        positioning_penalty = st.number_input(f"{ct['name']} Positioning Penalty", value=ct.get("positioning_penalty", 0.02), format="%.3f")
+        base_retrieval_time = st.number_input(f"{ct['name']} Base Retrieval Time", value=ct.get("base_retrieval_time", 0.1), format="%.3f")
+        moving_penalty = st.number_input(f"{ct['name']} Moving Penalty", value=ct.get("moving_penalty", 0.03), format="%.3f")
+        enable_reorganization = st.checkbox(f"{ct['name']} Enable Reorganization", value=ct.get("enable_reorganization", False))
+        
         container_types.append({
             "name": ct["name"],
             "yard_capacity": yard_capacity,
             "initial_yard_fill": initial_yard_fill,
             "rail_percentage": rail_percentage,
             "unload_time": [unload_low, unload_high, unload_mode],
-            "truck_process_time": [truck_low, truck_high, truck_mode]
+            "truck_process_time": [truck_low, truck_high, truck_mode],
+            "max_stacking": max_stacking,
+            "base_positioning_time": base_positioning_time,
+            "positioning_penalty": positioning_penalty,
+            "base_retrieval_time": base_retrieval_time,
+            "moving_penalty": moving_penalty,
+            "enable_reorganization": enable_reorganization
         })
 
 # Step 3: Vessel Schedule
@@ -196,7 +210,7 @@ if st.button("Run Simulation"):
             x="Time",
             y="Checkpoint",
             orientation='h',
-            color="container_type",  # Color by container type
+            color="container_type",
             category_orders={"Checkpoint": checkpoint_order},
             title="Checkpoint Distributions by Container Type",
             labels={"Time": "Time (hours)", "Checkpoint": "Checkpoint", "container_type": "Container Type"}
@@ -210,7 +224,7 @@ if st.button("Run Simulation"):
             x="Time",
             y="Checkpoint",
             orientation='h',
-            color="mode",  # Color by transportation mode
+            color="mode",
             category_orders={"Checkpoint": checkpoint_order},
             title="Checkpoint Distributions by Transportation Mode",
             labels={"Time": "Time (hours)", "Checkpoint": "Checkpoint", "mode": "Mode"}
@@ -265,7 +279,7 @@ if st.button("Run Simulation"):
                        labels={"Time": "Time (hours)", "Cumulative_Type": "Cumulative Departures"})
         st.plotly_chart(fig5, use_container_width=True)
     
-    with st.expander("Container-Level data (dataset)", expanded=False):
+    with st.expander("Container-Level Data (Dataset)", expanded=False):
         st.subheader("Data Summary")
         st.write(df[df.vessel != "Initial"].head())
         

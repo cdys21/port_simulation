@@ -34,26 +34,25 @@ def vessel_arrival(env, vessel, berths, yards, gates, all_containers, container_
 def crane_unload(env, containers, yards, gates, all_containers, container_type_params,
                  cumulative_unloaded, cumulative_departures):
     for container in containers:
-        # Unloading time for each container based on its type.
+        # Determine unload time based on container type parameters.
         unload_low, unload_high, unload_mode = container_type_params[container.container_type]['unload_time']
         unload_time = random.triangular(unload_low, unload_high, unload_mode)
         yield env.timeout(unload_time)
         container.entered_yard = env.now
         cumulative_unloaded.append((env.now, container.container_type))
         yard = yards[container.container_type]
-        
-        # Try to add container to the yard. If full, delay the addition until space is available.
+        # Try to add the container to the yard.
         added, positioning_delay = yard.add_container(container)
+        # If not added (yard full), wait and try again.
         while not added:
-            yield env.timeout(1)  # Wait 1 time unit before rechecking.
+            yield env.timeout(1)
             added, positioning_delay = yard.add_container(container)
-        
-        # Yield for the positioning delay (simulating stacking delay).
+        # Wait for the positioning delay (stacking delay).
         yield env.timeout(positioning_delay)
-        
-        # Schedule departure process for the container.
+        # Schedule the departure process.
         env.process(container_departure(env, container, yard, gates, all_containers,
                                           container_type_params, cumulative_unloaded, cumulative_departures))
+
 
 def is_gate_open(time):
     hour = time % 24
@@ -82,13 +81,14 @@ def container_departure(env, container, yard, gates, all_containers, container_t
                 yield req
                 if not is_gate_open(env.now):
                     continue
-                # Before processing truck departure, retrieve the container from the yard.
+                # Retrieve the container from the yard with the proper delay.
                 removed, retrieval_delay = yard.remove_container(container)
                 while not removed:
                     yield env.timeout(1)
                     removed, retrieval_delay = yard.remove_container(container)
                 yield env.timeout(retrieval_delay)
                 container.loaded_for_transport = env.now
+                # Simulate truck processing time.
                 proc_low, proc_high, proc_mode = container_type_params[container.container_type]['truck_process_time']
                 process_time = random.triangular(proc_low, proc_high, proc_mode)
                 yield env.timeout(process_time)
@@ -96,36 +96,37 @@ def container_departure(env, container, yard, gates, all_containers, container_t
                     container.departed_port = env.now
                     all_containers.append(container)
                     cumulative_departures.append((env.now, container.mode, container.container_type))
-    # Rail containers will be handled in the train_departure_process.
 
 def train_departure_process(env, yards, gates, all_containers, cumulative_departures):
     while True:
         yield env.timeout(6)
-        # For rail, aggregate ready containers from each yard.
-        for container_type, yard in yards.items():
-            ready_containers = []
-            # Flatten containers from all stacks.
+        # Aggregate all rail containers that are ready for departure from every yard.
+        ready_containers = []
+        for yard in yards.values():
             for stack in yard.stacks:
                 for c in stack:
                     if c.mode == "Rail" and c.waiting_for_inland_tsp is not None and c.departed_port is None:
                         ready_containers.append(c)
-            # Sort containers by waiting time.
-            ready_containers.sort(key=lambda c: c.waiting_for_inland_tsp)
-            # Process a batch of containers.
+        # Sort ready containers by waiting time.
+        ready_containers.sort(key=lambda c: c.waiting_for_inland_tsp)
+        # Process a batch of up to 750 containers if available.
+        if ready_containers:
             departing = ready_containers[:750]
-            if departing:
-                yield env.timeout(2)  # Constant train loading time.
-                for container in departing:
+            yield env.timeout(2)  # Constant train loading time.
+            for container in departing:
+                # Get the appropriate yard for the container.
+                yard = yards[container.container_type]
+                removed, retrieval_delay = yard.remove_container(container)
+                while not removed:
+                    yield env.timeout(1)
                     removed, retrieval_delay = yard.remove_container(container)
-                    while not removed:
-                        yield env.timeout(1)
-                        removed, retrieval_delay = yard.remove_container(container)
-                    yield env.timeout(retrieval_delay)
-                    container.loaded_for_transport = env.now
-                    container.departed_port = env.now
-                    all_containers.append(container)
-                    cumulative_departures.append((env.now, container.mode, container.container_type))
-                print(f"Train departed at {env.now:.2f} with {len(departing)} containers")
+                yield env.timeout(retrieval_delay)
+                container.loaded_for_transport = env.now
+                container.departed_port = env.now
+                all_containers.append(container)
+                cumulative_departures.append((env.now, container.mode, container.container_type))
+            print(f"Train departed at {env.now:.2f} with {len(departing)} containers")
+
 
 def monitor(env, yards, metrics):
     while True:

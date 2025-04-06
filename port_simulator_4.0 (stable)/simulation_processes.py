@@ -41,9 +41,16 @@ def crane_unload(env, containers, yards, gates, all_containers, container_type_p
         container.entered_yard = env.now
         cumulative_unloaded.append((env.now, container.container_type))
         yard = yards[container.container_type]
-        if yard.add_container(container):
-            env.process(container_departure(env, container, yard, gates, all_containers,
-                                            container_type_params, cumulative_unloaded, cumulative_departures))
+        # Add container to yard using stacking logic.
+        added, positioning_delay = yard.add_container(container)
+        while not added:
+            yield env.timeout(1)
+            added, positioning_delay = yard.add_container(container)
+        # Wait for the stacking/positioning delay.
+        yield env.timeout(positioning_delay)
+        env.process(container_departure(env, container, yard, gates, all_containers,
+                                          container_type_params, cumulative_unloaded, cumulative_departures))
+
 
 def is_gate_open(time):
     hour = time % 24
@@ -72,16 +79,20 @@ def container_departure(env, container, yard, gates, all_containers, container_t
                 yield req
                 if not is_gate_open(env.now):
                     continue
+                # Remove container from yard with retrieval delay based on stacking.
+                removed, retrieval_delay = yard.remove_container(container)
+                while not removed:
+                    yield env.timeout(1)
+                    removed, retrieval_delay = yard.remove_container(container)
+                yield env.timeout(retrieval_delay)
                 container.loaded_for_transport = env.now
                 proc_low, proc_high, proc_mode = container_type_params[container.container_type]['truck_process_time']
                 process_time = random.triangular(proc_low, proc_high, proc_mode)
                 yield env.timeout(process_time)
                 if is_gate_open(env.now):
                     container.departed_port = env.now
-                    yard.remove_container(container)
                     all_containers.append(container)
                     cumulative_departures.append((env.now, container.mode, container.container_type))
-    # Rail containers will be handled in train_departure_process
 
 def train_departure_process(env, yards, gates, all_containers, cumulative_departures):
     while True:
@@ -162,35 +173,55 @@ def plot_yard_occupancy(yard_metrics):
     fig.show()
 
 def run_simulation(config, progress_callback=None):
+    import simpy
+    import pandas as pd
+    from simulation_models import Vessel, Yard  # Make sure these reflect the updated versions
+
     env = simpy.Environment()
     berths = simpy.Resource(env, capacity=config["berth_count"])
     gates = simpy.Resource(env, capacity=config.get("gate_count", 120))
     
+    # Build a dict for container type parameters.
     container_type_params = {ct["name"]: ct for ct in config["container_types"]}
+    
+    # Create a yard for each container type using the new stacking parameters.
     yards = {}
     for ct in config["container_types"]:
         name = ct["name"]
         capacity = ct["yard_capacity"]
+        # Calculate initial count based on yard capacity and fill percentage.
         initial_count = int(capacity * ct.get("initial_yard_fill", 0))
-        yards[name] = Yard(capacity, initial_count)
+        yards[name] = Yard(
+            capacity,
+            initial_count,
+            max_stacking=ct.get("max_stacking", 5),
+            base_positioning_time=ct.get("base_positioning_time", 0.05),
+            positioning_penalty=ct.get("positioning_penalty", 0.02),
+            base_retrieval_time=ct.get("base_retrieval_time", 0.1),
+            moving_penalty=ct.get("moving_penalty", 0.03)
+        )
+        # For pre-filled containers, ensure their container_type is set.
         for container in yards[name].containers:
             container.container_type = name
-    
+
+    # Metrics for monitoring.
     metrics = {
         "yard_occupancy": [],
         "truck_queue": [],
         "rail_queue": [],
         "gate_status": []
     }
-    all_containers = []
     yard_metrics = {yard_name: [] for yard_name in yards.keys()}
-    cumulative_unloaded = []      # (time, container_type)
-    cumulative_departures = []    # (time, mode, container_type)
-    
+    cumulative_unloaded = []      # List of tuples: (time, container_type)
+    cumulative_departures = []    # List of tuples: (time, mode, container_type)
+    all_containers = []           # All containers that have departed.
+
+    # Start monitoring processes.
     env.process(monitor(env, yards, metrics))
     env.process(monitor_yard_occupancy(env, yards, yard_metrics))
     env.process(train_departure_process(env, yards, gates, all_containers, cumulative_departures))
     
+    # Process vessel arrivals.
     for vessel_data in config["vessels"]:
         vessel = Vessel(
             env,
@@ -203,21 +234,24 @@ def run_simulation(config, progress_callback=None):
         env.process(vessel_arrival(env, vessel, berths, yards, gates, all_containers,
                                     container_type_params, cumulative_unloaded, cumulative_departures))
     
+    # Process departure for any initial containers in the yards.
     for yard in yards.values():
         for container in yard.containers[:]:
             env.process(container_departure(env, container, yard, gates, all_containers,
                                             container_type_params, cumulative_unloaded, cumulative_departures))
     
+    # Run the simulation in 1-hour increments to allow progress updates.
     duration = config.get("simulation_duration", 48)
-    # Run simulation in 1-hour increments to update progress.
     for t in range(1, duration + 1):
         env.run(until=t)
         if progress_callback:
             progress_callback(t / duration)
     
+    # Create a dataframe from all departed containers.
     df = create_dataframe(all_containers)
     print(f"\nSimulation processed {len(all_containers)} containers.")
     
+    # Add cumulative data to metrics for plotting.
     metrics["cumulative_unloaded"] = cumulative_unloaded
     metrics["cumulative_departures"] = cumulative_departures
     
