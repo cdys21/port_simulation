@@ -1,5 +1,5 @@
-#simulation_models.py
-import random, math
+# simulation_models.py
+import random
 
 class Container:
     """
@@ -48,37 +48,31 @@ class Vessel:
 
 class Yard:
     """
-    Simplified Yard model that treats the yard as a flat container list
-    without any stacking logic or delays based on container position.
+    Manages container storage for a specific container type with capacity constraints.
     """
     def __init__(self, capacity, initial_count):
         self.capacity = capacity
         self.containers = []
-
         for _ in range(initial_count):
-            container = Container("Initial", None, None, random.choice(['Rail', 'Road']), None)
+            container = Container(
+                "Initial",
+                None,
+                None,
+                random.choice(['Rail', 'Road']),
+                None  # container_type will be set later
+            )
             container.entered_yard = 0
             self.containers.append(container)
-
+    
     def add_container(self, container):
-        """
-        Adds a container to the yard if there is available capacity.
-        Returns (True, positioning_delay) if successful; otherwise (False, None).
-        """
         if len(self.containers) >= self.capacity:
-            print(f"WARNING: Yard capacity ({self.capacity}) reached, container not added")
-            return False, None
+            print(f"WARNING: Yard capacity ({self.capacity}) exceeded, container not added")
+            return False
         self.containers.append(container)
-        positioning_delay = 0.05  # Use a constant positioning delay
-        return True, positioning_delay
-
+        return True
+    
     def remove_container(self, container):
-        """
-        Removes the container from the yard.
-        Returns (True, retrieval_delay) if successful; otherwise (False, None).
-        """
-        if container not in self.containers:
-            return False, None
-        self.containers.remove(container)
-        retrieval_delay = 0.1  # Use a constant retrieval delay
-        return True, retrieval_delay
+        if container in self.containers:
+            self.containers.remove(container)
+            return True
+        return False
