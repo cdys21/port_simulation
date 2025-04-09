@@ -1,3 +1,4 @@
+#simulation_models.py
 import random, math
 
 class Container:
@@ -15,9 +16,6 @@ class Container:
         self.departed_port = None
         self.mode = mode  # 'Rail' or 'Road'
         self.container_type = container_type  # e.g., 'Standard', 'Reefer', 'Hazardous'
-        # New attributes for stacking
-        self.stack_index = None
-        self.stack_level = None
 
 class Vessel:
     """
@@ -50,81 +48,37 @@ class Vessel:
 
 class Yard:
     """
-    Manages container storage for a specific container type with capacity constraints and stacking.
-    The yard is divided into stacks. Containers are added to the stack with the lowest height.
-    The positioning delay is based on the container's level in its stack.
-    When retrieving a container, the delay is based on the number of containers above it.
+    Simplified Yard model that treats the yard as a flat container list
+    without any stacking logic or delays based on container position.
     """
-    def __init__(self, capacity, initial_count, max_stacking=5,
-                 base_positioning_time=0.05, positioning_penalty=0.02,
-                 base_retrieval_time=0.1, moving_penalty=0.03):
+    def __init__(self, capacity, initial_count):
         self.capacity = capacity
-        self.max_stacking = max_stacking
-        self.base_positioning_time = base_positioning_time
-        self.positioning_penalty = positioning_penalty
-        self.base_retrieval_time = base_retrieval_time
-        self.moving_penalty = moving_penalty
-        # Determine number of stacks; assume capacity is the total number of containers allowed.
-        self.num_stacks = capacity // max_stacking  
-        self.stacks = [[] for _ in range(self.num_stacks)]
-        
-        # Pre-fill the yard with initial_count containers.
-        for i in range(initial_count):
-            placed = False
-            for s in range(self.num_stacks):
-                if len(self.stacks[s]) < self.max_stacking:
-                    container = Container("Initial", None, None, random.choice(['Rail', 'Road']), None)
-                    container.entered_yard = 0
-                    container.stack_index = s
-                    container.stack_level = len(self.stacks[s]) + 1
-                    self.stacks[s].append(container)
-                    placed = True
-                    break
-            if not placed:
-                print("WARNING: Yard is full during initial fill.")
-                break
+        self.containers = []
+
+        for _ in range(initial_count):
+            container = Container("Initial", None, None, random.choice(['Rail', 'Road']), None)
+            container.entered_yard = 0
+            self.containers.append(container)
 
     def add_container(self, container):
         """
-        Attempts to add the container to the yard.
+        Adds a container to the yard if there is available capacity.
         Returns (True, positioning_delay) if successful; otherwise (False, None).
         """
-        if all(len(stack) >= self.max_stacking for stack in self.stacks):
+        if len(self.containers) >= self.capacity:
             print(f"WARNING: Yard capacity ({self.capacity}) reached, container not added")
             return False, None
-        # Find the stack with the minimum height that is not full.
-        candidate_index = None
-        min_height = self.max_stacking + 1
-        for idx, stack in enumerate(self.stacks):
-            if len(stack) < self.max_stacking and len(stack) < min_height:
-                candidate_index = idx
-                min_height = len(stack)
-        if candidate_index is None:
-            print("WARNING: No available stack found.")
-            return False, None
-        container.stack_index = candidate_index
-        container.stack_level = len(self.stacks[candidate_index]) + 1
-        self.stacks[candidate_index].append(container)
-        positioning_delay = self.base_positioning_time + (container.stack_level - 1) * self.positioning_penalty
+        self.containers.append(container)
+        positioning_delay = 0.05  # Use a constant positioning delay
         return True, positioning_delay
 
     def remove_container(self, container):
         """
-        Removes the container from its stack.
-        Computes retrieval delay based on how many containers are above it.
-        Returns (True, retrieval_delay) if removal is successful; otherwise (False, None).
+        Removes the container from the yard.
+        Returns (True, retrieval_delay) if successful; otherwise (False, None).
         """
-        if container.stack_index is None or container.stack_index >= len(self.stacks):
+        if container not in self.containers:
             return False, None
-        stack = self.stacks[container.stack_index]
-        if container not in stack:
-            return False, None
-        pos = stack.index(container)  # 0-indexed; top container is at the end.
-        # Number of containers above:
-        num_above = len(stack) - pos - 1
-        retrieval_delay = self.base_retrieval_time + num_above * self.moving_penalty
-        stack.pop(pos)
-        # Update levels for remaining containers in the stack.
-        for i, cont in enumerate(stack):
-            cont.stack_level = i + 1
+        self.containers.remove(container)
+        retrieval_delay = 0.1  # Use a constant retrieval delay
         return True, retrieval_delay

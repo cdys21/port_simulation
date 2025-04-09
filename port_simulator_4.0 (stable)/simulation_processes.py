@@ -41,16 +41,21 @@ def crane_unload(env, containers, yards, gates, all_containers, container_type_p
         container.entered_yard = env.now
         cumulative_unloaded.append((env.now, container.container_type))
         yard = yards[container.container_type]
-        # Add container to yard using stacking logic.
-        added, positioning_delay = yard.add_container(container)
+
+        # Try to add the container to the yard
+        added, _ = yard.add_container(container)
         while not added:
             yield env.timeout(1)
-            added, positioning_delay = yard.add_container(container)
-        # Wait for the stacking/positioning delay.
-        yield env.timeout(positioning_delay)
-        env.process(container_departure(env, container, yard, gates, all_containers,
-                                          container_type_params, cumulative_unloaded, cumulative_departures))
+            added, _ = yard.add_container(container)
 
+        # Optional short constant delay to simulate positioning (can be removed if undesired)
+        yield env.timeout(0.05)
+
+        # Start the inland departure process
+        env.process(container_departure(
+            env, container, yard, gates, all_containers,
+            container_type_params, cumulative_unloaded, cumulative_departures
+        ))
 
 def is_gate_open(time):
     hour = time % 24
@@ -184,22 +189,14 @@ def run_simulation(config, progress_callback=None):
     # Build a dict for container type parameters.
     container_type_params = {ct["name"]: ct for ct in config["container_types"]}
     
-    # Create a yard for each container type using the new stacking parameters.
     yards = {}
     for ct in config["container_types"]:
         name = ct["name"]
         capacity = ct["yard_capacity"]
         # Calculate initial count based on yard capacity and fill percentage.
         initial_count = int(capacity * ct.get("initial_yard_fill", 0))
-        yards[name] = Yard(
-            capacity,
-            initial_count,
-            max_stacking=ct.get("max_stacking", 5),
-            base_positioning_time=ct.get("base_positioning_time", 0.05),
-            positioning_penalty=ct.get("positioning_penalty", 0.02),
-            base_retrieval_time=ct.get("base_retrieval_time", 0.1),
-            moving_penalty=ct.get("moving_penalty", 0.03)
-        )
+        yards[name] = Yard(capacity, initial_count)
+
         # For pre-filled containers, ensure their container_type is set.
         for container in yards[name].containers:
             container.container_type = name
