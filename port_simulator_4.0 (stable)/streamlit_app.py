@@ -249,6 +249,6 @@ if st.button("Run Simulation"):
     
     with st.expander("Container-Level data (dataset)", expanded=False):
         st.subheader("Data Summary")
-        st.write(df[df.vessel != "Initial"].head())
+        st.write(df[df.vessel != "Initial"])
         
     st.success("All plots generated.")
