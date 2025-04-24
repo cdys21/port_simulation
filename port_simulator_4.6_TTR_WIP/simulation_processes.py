@@ -5,31 +5,33 @@ import pandas as pd
 import plotly.graph_objects as go
 from simulation_models import Container, Vessel, Yard
 
-def vessel_arrival(env, vessel, berths, yards, gates, all_containers, container_type_params,
-                   cumulative_unloaded, cumulative_departures, cranes_per_vessel):
+def vessel_arrival(env, vessel, berths, yards, gates, all_containers,
+                   container_type_params, cumulative_unloaded, cumulative_departures,
+                   config):
     yield env.timeout(vessel.actual_arrival)
     print(f"{vessel.name} arrives at {env.now:.2f}")
-    
+
     with berths.request() as req:
         yield req
         vessel.vessel_berths = env.now
         for container in vessel.containers:
             container.vessel_berths = env.now
         print(f"{vessel.name} berths at {env.now:.2f}")
-        
-        # divide work among cranes_per_vessel cranes instead of 4
+
+        # use the *current* crane count from config
         total = len(vessel.containers)
-        per = total // cranes_per_vessel
-        rem = total % cranes_per_vessel
+        cranes = config["cranes_per_vessel"]
+        per = total // cranes
+        rem = total % cranes
         start = 0
         procs = []
-        for i in range(cranes_per_vessel):
+        for i in range(cranes):
             num = per + (1 if i < rem else 0)
             slice_ = vessel.containers[start:start + num]
             start += num
             procs.append(env.process(
                 crane_unload(env, slice_, yards, gates, all_containers,
-                            container_type_params, cumulative_unloaded, cumulative_departures)
+                             container_type_params, cumulative_unloaded, cumulative_departures)
             ))
         yield env.all_of(procs)
         print(f"{vessel.name} unloading complete at {env.now:.2f}")
@@ -164,70 +166,182 @@ def plot_yard_occupancy(yard_metrics):
                       yaxis_title="Occupancy")
     fig.show()
 
-def run_simulation(config, progress_callback=None):
-    # seed RNG if provided
+def run_simulation(
+    config,
+    progress_callback=None,
+    disruption_type=None,
+    disruption_t0=None,
+    disruption_duration=None,
+    recovery_threshold=1.0
+):
+    """
+    Runs one replicate of the port simulation.
+    If disruption_type is set, injects a single shock at disruption_t0
+    lasting disruption_duration hours, and measures:
+      - TTR: time until total yard occupancy ≤ baseline * recovery_threshold
+      - time_to_zero: time until yard occupancy == 0
+    Returns:
+      df           : pandas.DataFrame of container checkpoint times
+      metrics      : dict containing time series and, if disrupted, a 'resilience' entry
+      yard_metrics : dict of per-yard occupancy time series
+    """
+    import random
+    import simpy
+    from simulation_processes import (
+        baseline_snapshot, disruption_event,
+        monitor, monitor_yard_occupancy,
+        train_departure_process, vessel_arrival,
+        create_dataframe
+    )
+    from simulation_models import Yard, Vessel
+
+    # 1. Seed RNG
     if config.get("random_seed") is not None:
         random.seed(config["random_seed"])
 
-    env = simpy.Environment()
+    # 2. Create environment and shared resources
+    env    = simpy.Environment()
     berths = simpy.Resource(env, capacity=config["berth_count"])
     gates  = simpy.Resource(env, capacity=config["gate_count"])
-    
+
+    # 3. Build yards and collect type parameters
     container_type_params = {ct["name"]: ct for ct in config["container_types"]}
     yards = {}
     for ct in config["container_types"]:
-        name = ct["name"]
-        capacity = ct["yard_capacity"]
-        initial_count = int(capacity * ct.get("initial_yard_fill", 0))
-        yards[name] = Yard(capacity, initial_count)
-        for container in yards[name].containers:
-            container.container_type = name
-    
+        name   = ct["name"]
+        cap    = ct["yard_capacity"]
+        init_n = int(cap * ct.get("initial_yard_fill", 0))
+        yard   = Yard(cap, init_n)
+        # ensure container_type is set on the preloaded containers
+        for c in yard.containers:
+            c.container_type = name
+        yards[name] = yard
+
+    # 4. Initialize metrics containers
     metrics = {
         "yard_occupancy": [],
-        "truck_queue": [],
-        "rail_queue": [],
-        "gate_status": []
+        "truck_queue":    [],
+        "rail_queue":     [],
+        "gate_status":    []
     }
-    all_containers = []
-    yard_metrics = {yard_name: [] for yard_name in yards.keys()}
-    cumulative_unloaded = []      # (time, container_type)
-    cumulative_departures = []    # (time, mode, container_type)
-    
-    # start monitors
+    yard_metrics        = {name: [] for name in yards}
+    all_containers      = []
+    cumulative_unloaded = []
+    cumulative_departures = []
+
+    # 5. Schedule disruption helper processes if requested
+    baseline_store = {}
+    if disruption_type:
+        # record the pre-shock yard occupancy
+        env.process(baseline_snapshot(env, yards, disruption_t0, baseline_store))
+        # inject the shock and restore after duration
+        env.process(disruption_event(
+            env,
+            disruption_type,
+            disruption_t0,
+            disruption_duration,
+            berths, gates,
+            config
+        ))
+
+    # 6. Start monitoring and train departure processes
     env.process(monitor(env, yards, metrics))
     env.process(monitor_yard_occupancy(env, yards, yard_metrics))
-    # pass new params into train process
     env.process(train_departure_process(
-        env, yards, gates, all_containers, cumulative_departures,
+        env, yards, gates,
+        all_containers, cumulative_departures,
         config["trains_per_day"], config["train_capacity"]
     ))
 
-    # vessel arrivals: pass cranes_per_vessel
+    # 7. Schedule vessel arrivals (unloading)
     for v in config["vessels"]:
-        vessel = Vessel(env, v["name"], v["container_counts"], v["day"], v["hour"], container_type_params)
+        vessel = Vessel(
+            env, v["name"], v["container_counts"],
+            v["day"], v["hour"], container_type_params
+        )
         env.process(vessel_arrival(
-            env, vessel, berths, yards, gates, all_containers,
-            container_type_params, cumulative_unloaded, cumulative_departures,
-            config["cranes_per_vessel"]
+            env, vessel, berths, yards, gates,
+            all_containers, container_type_params,
+            cumulative_unloaded, cumulative_departures,
+            config
         ))
-    
+
+    # 8. Kick off departures for initial yard contents
     for yard in yards.values():
-        for container in yard.containers[:]:
-            env.process(truck_departure_process(env, container, yard, gates, all_containers,
-                                            container_type_params, cumulative_unloaded, cumulative_departures))
-    
+        for container in list(yard.containers):
+            env.process(truck_departure_process(
+                env, container, yard, gates,
+                all_containers, container_type_params,
+                cumulative_unloaded, cumulative_departures
+            ))
+
+    # 9. Run simulation in hourly increments to update progress
     duration = config.get("simulation_duration", 48)
-    # Run simulation in 1-hour increments to update progress.
-    for t in range(1, duration + 1):
-        env.run(until=t)
+    for hour in range(1, duration + 1):
+        env.run(until=hour)
         if progress_callback:
-            progress_callback(t / duration)
-    
+            progress_callback(hour / duration)
+
+    # 10. Collect container‐level data
     df = create_dataframe(all_containers)
-    print(f"\nSimulation processed {len(all_containers)} containers.")
-    
-    metrics["cumulative_unloaded"] = cumulative_unloaded
+    metrics["cumulative_unloaded"]   = cumulative_unloaded
     metrics["cumulative_departures"] = cumulative_departures
-    
+
+    # 11. If disrupted, compute TTR and time_to_zero
+    if disruption_type:
+        occ      = metrics["yard_occupancy"]  # list of (time, occupancy)
+        baseline = baseline_store.get("baseline_occ")
+        # find first time ≥ t0 with occupancy ≤ baseline * threshold
+        t1 = next(
+            (t for t, occv in occ
+             if t >= disruption_t0 and occv <= baseline * recovery_threshold),
+            None
+        )
+        TTR = (t1 - disruption_t0) if t1 is not None else None
+        # find first time occupancy == 0
+        tz = next((t for t, occv in occ if occv == 0), None)
+
+        metrics["resilience"] = {
+            "type":           disruption_type,
+            "t0":             disruption_t0,
+            "baseline_occ":   baseline,
+            "t1":             t1,
+            "TTR":            TTR,
+            "time_to_zero":   tz
+        }
+
     return df, metrics, yard_metrics
+
+
+# ── NEW HELPER PROCESSES ────────────────────────────────────────
+
+def baseline_snapshot(env, yards, t0, store):
+    """At time t0, record the total yard occupancy into store['baseline_occ']."""
+    yield env.timeout(t0)
+    store['baseline_occ'] = sum(len(y.containers) for y in yards.values())
+    print(f"Baseline occupancy ({store['baseline_occ']}) sampled at {env.now:.2f}")
+
+def disruption_event(env, disruption_type, t0, duration, berths, gates, config):
+    """At t0, apply the chosen disruption for `duration` hours, then restore."""
+    yield env.timeout(t0)
+    print(f"** Disruption '{disruption_type}' START at {env.now:.2f}")
+    if disruption_type == "Gate Outage":
+        # grab the real underlying capacity
+        orig = gates._capacity
+        # knock out all gates
+        gates._capacity = 0
+        yield env.timeout(duration)
+        # restore original capacity
+        gates._capacity = orig
+        print(f"** Gates restored at {env.now:.2f}")
+
+
+    elif disruption_type == "Crane Failure":
+        orig = config["cranes_per_vessel"]
+        # knock out one crane (but leave at least one)
+        config["cranes_per_vessel"] = max(1, orig - 1)
+        yield env.timeout(duration)
+        config["cranes_per_vessel"] = orig
+        print(f"** Cranes restored at {env.now:.2f}")
+
+# ── END NEW PROCESSES ──────────────────────────────────────────
