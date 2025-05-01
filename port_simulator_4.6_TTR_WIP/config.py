@@ -1,4 +1,5 @@
 # config.py
+
 default_config = {
     "berth_count": 4,
     "gate_count": 120,
