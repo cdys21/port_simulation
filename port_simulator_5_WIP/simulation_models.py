@@ -1,5 +1,4 @@
 # simulation_models.py
-
 import random
 
 class Container:

@@ -1,15 +1,14 @@
 # config.py
-
 default_config = {
     "berth_count": 4,
     "gate_count": 120,
     "simulation_duration": 150,
     "save_csv": False,
     "output_file": "container_checkpoints.csv",
-    "random_seed": 42,
-    "cranes_per_vessel": 4,
-    "trains_per_day": 4,
-    "train_capacity": 750,
+    "random_seed": 42,              # ← new
+    "cranes_per_vessel": 4,         # ← new
+    "trains_per_day": 4,            # ← new (every 6 h)
+    "train_capacity": 750,          # ← new
     "container_types": [
         {
             "name": "Standard",
@@ -91,15 +90,5 @@ default_config = {
             "day": 2,
             "hour": 15
         }
-    ],
-    # ────────────────────────────────────────────────────────────
-    # Resilience experiment defaults
-    "resilience": {
-        "runs": 50,
-        "disruption_types": ["Gate Outage", "Crane Failure"],
-        "window_start": 1,
-        "window_end": 100,
-        "duration": 4,
-        "threshold": 1.0
-    }
+    ]
 }
