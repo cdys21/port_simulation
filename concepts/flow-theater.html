@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Flow Theater Concept</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #081017;
+        --ink: #eef7ff;
+        --muted: #95aabf;
+        --line: rgba(167, 191, 214, 0.14);
+        --teal: #1fcca9;
+        --blue: #72a8ff;
+        --amber: #ffc16f;
+        --coral: #ff7b62;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Avenir Next", "Segoe UI", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 20% 20%, rgba(31, 204, 169, 0.14), transparent 20%),
+          radial-gradient(circle at 80% 10%, rgba(114, 168, 255, 0.12), transparent 24%),
+          linear-gradient(180deg, #091018 0%, #05090e 100%);
+      }
+
+      .shell {
+        width: min(1440px, calc(100% - 36px));
+        margin: 0 auto;
+        padding: 26px 0 30px;
+      }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        align-items: end;
+        margin-bottom: 18px;
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: var(--amber);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        font-size: 0.78rem;
+        font-weight: 700;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 3rem;
+        line-height: 0.94;
+      }
+
+      .lede {
+        margin: 10px 0 0;
+        max-width: 700px;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .modes {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .mode {
+        padding: 10px 14px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--muted);
+      }
+
+      .stage {
+        padding: 24px;
+        border-radius: 32px;
+        border: 1px solid var(--line);
+        background: rgba(9, 18, 28, 0.76);
+        box-shadow: 0 28px 70px rgba(0, 0, 0, 0.3);
+      }
+
+      .topbar {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+        margin-bottom: 18px;
+      }
+
+      .metric {
+        padding: 16px 18px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .metric span {
+        display: block;
+        color: var(--muted);
+        font-size: 0.8rem;
+      }
+
+      .metric strong {
+        display: block;
+        margin-top: 8px;
+        font-size: 1.7rem;
+      }
+
+      .theater {
+        display: grid;
+        grid-template-columns: 1fr 320px;
+        gap: 18px;
+      }
+
+      .runway {
+        position: relative;
+        min-height: 560px;
+        padding: 28px 18px 100px;
+        border-radius: 30px;
+        background:
+          radial-gradient(circle at center, rgba(255, 255, 255, 0.04), transparent 52%),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01));
+        overflow: hidden;
+      }
+
+      .band {
+        position: relative;
+        min-height: 102px;
+        margin-bottom: 22px;
+        border-radius: 28px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        background: rgba(255, 255, 255, 0.02);
+        display: grid;
+        grid-template-columns: 210px 1fr 210px;
+        align-items: center;
+        padding: 0 22px;
+      }
+
+      .band:last-of-type { margin-bottom: 0; }
+
+      .label {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--muted);
+      }
+
+      .stage-name {
+        margin-top: 8px;
+        font-size: 1.4rem;
+        font-weight: 700;
+      }
+
+      .stream {
+        position: relative;
+        height: 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.06);
+        overflow: hidden;
+      }
+
+      .stream::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-size: 48px 12px;
+        animation: stream 2.8s linear infinite;
+      }
+
+      .s1::before { background-image: repeating-linear-gradient(90deg, rgba(114, 168, 255, 0.92) 0 10px, transparent 10px 26px); }
+      .s2::before { background-image: repeating-linear-gradient(90deg, rgba(31, 204, 169, 0.92) 0 12px, transparent 12px 24px); }
+      .s3::before { background-image: repeating-linear-gradient(90deg, rgba(255, 193, 111, 0.96) 0 10px, transparent 10px 22px); }
+      .s4::before { background-image: repeating-linear-gradient(90deg, rgba(255, 123, 98, 0.96) 0 10px, transparent 10px 20px); }
+
+      .volume {
+        text-align: right;
+      }
+
+      .volume strong {
+        display: block;
+        font-size: 1.6rem;
+      }
+
+      .volume span {
+        color: var(--muted);
+      }
+
+      .overlay-vessel {
+        position: absolute;
+        left: 44px;
+        top: 72px;
+        width: 160px;
+        padding: 16px;
+        border-radius: 20px;
+        background: linear-gradient(135deg, rgba(23, 72, 115, 0.94), rgba(14, 47, 74, 0.92));
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.24);
+      }
+
+      .overlay-vessel small,
+      .overlay-alert small {
+        display: block;
+        color: rgba(255, 255, 255, 0.7);
+      }
+
+      .overlay-vessel strong,
+      .overlay-alert strong {
+        display: block;
+        margin: 6px 0 4px;
+        font-size: 1.1rem;
+      }
+
+      .overlay-alert {
+        position: absolute;
+        right: 44px;
+        top: 86px;
+        width: 200px;
+        padding: 16px;
+        border-radius: 20px;
+        background: linear-gradient(135deg, rgba(107, 35, 21, 0.94), rgba(140, 67, 38, 0.9));
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.24);
+      }
+
+      .sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .panel {
+        padding: 18px;
+        border-radius: 24px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .panel h3 {
+        margin: 0 0 12px;
+        font-size: 1rem;
+      }
+
+      .chain {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .step {
+        padding: 12px 14px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--muted);
+        line-height: 1.45;
+      }
+
+      .step strong {
+        display: block;
+        color: var(--ink);
+        margin-bottom: 4px;
+      }
+
+      .ticker {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 18px;
+      }
+
+      .ticker .panel {
+        padding: 14px;
+      }
+
+      .footer-back {
+        margin-top: 16px;
+      }
+
+      .footer-back a {
+        color: var(--muted);
+        text-decoration: none;
+      }
+
+      @keyframes stream {
+        to { background-position: -96px 0; }
+      }
+
+      @media (max-width: 1180px) {
+        .theater {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 900px) {
+        .topbar,
+        .ticker {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .band {
+          grid-template-columns: 1fr;
+          gap: 14px;
+          padding: 18px;
+        }
+
+        .volume {
+          text-align: left;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="header">
+        <div>
+          <p class="eyebrow">Option B</p>
+          <h1>Flow Theater</h1>
+          <p class="lede">
+            This direction makes movement the star. The user reads the terminal as a living stream
+            from vessel to yard to inland transport, with disruption consequences shown as thickened
+            streams and alert overlays.
+          </p>
+        </div>
+        <div class="modes">
+          <div class="mode">Presentation-heavy</div>
+          <div class="mode">Best for explaining cause and effect</div>
+          <div class="mode">Less literal than Control Tower</div>
+        </div>
+      </header>
+
+      <section class="stage">
+        <div class="topbar">
+          <div class="metric"><span>Now Playing</span><strong>Day 1 14:20</strong></div>
+          <div class="metric"><span>Dominant Pressure</span><strong>Gate spillback</strong></div>
+          <div class="metric"><span>Yard Density</span><strong>76%</strong></div>
+          <div class="metric"><span>Exports at Risk</span><strong>14 units</strong></div>
+        </div>
+
+        <div class="theater">
+          <div class="runway">
+            <div class="overlay-vessel">
+              <small>Current vessel</small>
+              <strong>Liberty Meridian</strong>
+              <small>load phase | 17 exports still waiting on quay-ready release</small>
+            </div>
+            <div class="overlay-alert">
+              <small>Active disruption</small>
+              <strong>1 STS crane offline</strong>
+              <small>Throughput loss is cascading into gate and export pressure.</small>
+            </div>
+
+            <div class="band">
+              <div>
+                <div class="label">Quay</div>
+                <div class="stage-name">Vessel service</div>
+              </div>
+              <div class="stream s1"></div>
+              <div class="volume">
+                <strong>32 active moves</strong>
+                <span>discharge + load contention</span>
+              </div>
+            </div>
+
+            <div class="band">
+              <div>
+                <div class="label">Storage</div>
+                <div class="stage-name">Yard accumulation</div>
+              </div>
+              <div class="stream s2"></div>
+              <div class="volume">
+                <strong>184 dots in block</strong>
+                <span>burial depth climbing</span>
+              </div>
+            </div>
+
+            <div class="band">
+              <div>
+                <div class="label">Inland</div>
+                <div class="stage-name">Truck gate lanes</div>
+              </div>
+              <div class="stream s3"></div>
+              <div class="volume">
+                <strong>31 waiting</strong>
+                <span>pickup side overwhelming receive</span>
+              </div>
+            </div>
+
+            <div class="band">
+              <div>
+                <div class="label">Rail</div>
+                <div class="stage-name">Train staging</div>
+              </div>
+              <div class="stream s4"></div>
+              <div class="volume">
+                <strong>16 queued</strong>
+                <span>next departure in 40m</span>
+              </div>
+            </div>
+          </div>
+
+          <aside class="sidebar">
+            <div class="panel">
+              <h3>Why this screen works</h3>
+              <div class="chain">
+                <div class="step">
+                  <strong>Big moving bands</strong>
+                  Users see where flow is smooth versus choking.
+                </div>
+                <div class="step">
+                  <strong>Overlays explain the scene</strong>
+                  The vessel and disruption cards keep the narrative legible.
+                </div>
+                <div class="step">
+                  <strong>Best for demos</strong>
+                  This is the strongest option if explaining dynamic consequences is the priority.
+                </div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <h3>Intervention rack</h3>
+              <div class="chain">
+                <div class="step"><strong>Add pop-up vessel</strong> A new blue stream appears and the berth band thickens.</div>
+                <div class="step"><strong>Close one gate lane</strong> The gate band expands and the consequence rail turns amber.</div>
+                <div class="step"><strong>Extend gate hours</strong> The truck band narrows and yard density recovers.</div>
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        <div class="ticker">
+          <div class="panel"><strong>14:20</strong><div style="color: var(--muted); margin-top: 8px;">Gate queue crossed 30.</div></div>
+          <div class="panel"><strong>13:55</strong><div style="color: var(--muted); margin-top: 8px;">Reefer block crossed congestion threshold.</div></div>
+          <div class="panel"><strong>13:40</strong><div style="color: var(--muted); margin-top: 8px;">Outbound train cleared 42 imports.</div></div>
+          <div class="panel"><strong>13:10</strong><div style="color: var(--muted); margin-top: 8px;">One crane went offline on the quay.</div></div>
+        </div>
+      </section>
+
+      <div class="footer-back">
+        <a href="./index.html">Back to concepts</a>
+      </div>
+    </main>
+  </body>
+</html>

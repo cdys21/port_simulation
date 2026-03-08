@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tactical Board Concept</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #111115;
+        --ink: #f7f0e7;
+        --muted: #c2b7a8;
+        --line: rgba(255, 255, 255, 0.1);
+        --olive: #7aaa4d;
+        --sand: #d8b383;
+        --rust: #de7447;
+        --navy: #355c8d;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Avenir Next", "Trebuchet MS", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(122, 170, 77, 0.12), transparent 26%),
+          radial-gradient(circle at bottom right, rgba(222, 116, 71, 0.14), transparent 28%),
+          linear-gradient(180deg, #131418 0%, #0d0d10 100%);
+      }
+
+      .shell {
+        width: min(1460px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 20px 0 24px;
+      }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        align-items: end;
+        margin-bottom: 16px;
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: var(--sand);
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        font-size: 0.76rem;
+        font-weight: 700;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 3rem;
+        line-height: 0.94;
+      }
+
+      .lede {
+        margin: 10px 0 0;
+        max-width: 760px;
+        color: var(--muted);
+        line-height: 1.58;
+      }
+
+      .header-badges {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .badge {
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--line);
+        color: var(--muted);
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 320px minmax(0, 1fr) 320px;
+        gap: 16px;
+      }
+
+      .panel {
+        background: rgba(23, 24, 30, 0.84);
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        box-shadow: 0 22px 50px rgba(0, 0, 0, 0.28);
+      }
+
+      .section {
+        padding: 18px;
+      }
+
+      .section h2,
+      .section h3 {
+        margin: 0 0 12px;
+        font-size: 1rem;
+      }
+
+      .stack {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .action {
+        padding: 14px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .action strong {
+        display: block;
+        margin-bottom: 6px;
+      }
+
+      .action p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      .chipline {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+      }
+
+      .chip {
+        padding: 6px 8px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.06);
+        font-size: 0.82rem;
+      }
+
+      .board {
+        padding: 18px;
+      }
+
+      .scorebar {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+
+      .score {
+        padding: 14px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .score span {
+        display: block;
+        color: var(--muted);
+        font-size: 0.8rem;
+      }
+
+      .score strong {
+        display: block;
+        margin-top: 8px;
+        font-size: 1.6rem;
+      }
+
+      .arena {
+        position: relative;
+        min-height: 540px;
+        border-radius: 30px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.02)),
+          radial-gradient(circle at center, rgba(255, 255, 255, 0.04), transparent 48%);
+        overflow: hidden;
+      }
+
+      .grid {
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+        background-size: 34px 34px;
+        opacity: 0.4;
+      }
+
+      .zone {
+        position: absolute;
+        border-radius: 28px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(8px);
+      }
+
+      .anchorage {
+        left: 24px;
+        top: 24px;
+        width: 150px;
+        height: 210px;
+        background: rgba(53, 92, 141, 0.26);
+      }
+
+      .quay {
+        left: 192px;
+        top: 24px;
+        width: 150px;
+        height: 210px;
+        background: rgba(216, 179, 131, 0.16);
+      }
+
+      .yard {
+        left: 360px;
+        top: 24px;
+        width: 320px;
+        height: 330px;
+        background: rgba(122, 170, 77, 0.16);
+      }
+
+      .inland {
+        left: 700px;
+        top: 24px;
+        width: 170px;
+        height: 150px;
+        background: rgba(222, 116, 71, 0.18);
+      }
+
+      .rail {
+        left: 700px;
+        top: 204px;
+        width: 170px;
+        height: 150px;
+        background: rgba(53, 92, 141, 0.24);
+      }
+
+      .zone h4 {
+        margin: 16px 16px 0;
+        font-size: 0.95rem;
+      }
+
+      .ship,
+      .token-cluster,
+      .lane-card,
+      .notice {
+        position: absolute;
+        border-radius: 18px;
+      }
+
+      .ship {
+        left: 214px;
+        width: 106px;
+        height: 40px;
+        background: linear-gradient(135deg, #355c8d, #20344e);
+        color: white;
+        padding: 10px 12px;
+        font-size: 0.82rem;
+        font-weight: 700;
+      }
+
+      .ship.alt {
+        top: 138px;
+        background: linear-gradient(135deg, #3e8a63, #1f4f3a);
+      }
+
+      .ship.main {
+        top: 76px;
+      }
+
+      .token-cluster {
+        background: rgba(255, 255, 255, 0.08);
+        padding: 12px;
+      }
+
+      .cluster-title {
+        font-size: 0.82rem;
+        color: var(--muted);
+        margin-bottom: 8px;
+      }
+
+      .dots {
+        display: grid;
+        grid-template-columns: repeat(10, 8px);
+        gap: 6px;
+      }
+
+      .dots i {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: block;
+      }
+
+      .lane-card {
+        padding: 12px;
+        width: 124px;
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .notice {
+        right: 20px;
+        bottom: 20px;
+        width: 228px;
+        padding: 14px;
+        background: linear-gradient(135deg, rgba(222, 116, 71, 0.92), rgba(139, 54, 26, 0.92));
+      }
+
+      .notice strong {
+        display: block;
+        margin-bottom: 6px;
+      }
+
+      .notice span {
+        color: rgba(255, 255, 255, 0.84);
+        line-height: 1.45;
+      }
+
+      .rightlist .action {
+        position: relative;
+      }
+
+      .rightlist .action::after {
+        content: "";
+        position: absolute;
+        left: 18px;
+        top: 44px;
+        bottom: -14px;
+        width: 2px;
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .rightlist .action:last-child::after { display: none; }
+
+      .footer-back {
+        margin-top: 16px;
+      }
+
+      .footer-back a {
+        color: var(--muted);
+        text-decoration: none;
+      }
+
+      @media (max-width: 1220px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 860px) {
+        .scorebar {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .arena {
+          overflow: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="header">
+        <div>
+          <p class="eyebrow">Option C</p>
+          <h1>Tactical Board</h1>
+          <p class="lede">
+            This is the most openly gamified direction. The command deck is prominent, the live
+            arena looks like a strategy board, and the consequence chain feels closer to mission
+            play than to a conventional dashboard.
+          </p>
+        </div>
+        <div class="header-badges">
+          <div class="badge">Highest sandbox energy</div>
+          <div class="badge">Strong disruption UX</div>
+          <div class="badge">More abstract than operations UI</div>
+        </div>
+      </header>
+
+      <section class="layout">
+        <aside class="panel section">
+          <h2>Command Deck</h2>
+          <div class="stack">
+            <div class="action">
+              <strong>Spawn ad-hoc vessel</strong>
+              <p>Tests whether the system can absorb a surprise feeder without breaking export load promises.</p>
+              <div class="chipline"><span class="chip">Berth stress</span><span class="chip">Quay stress</span></div>
+            </div>
+            <div class="action">
+              <strong>Disable crane #3</strong>
+              <p>Immediate throughput hit. Watch the arena shift toward orange and the consequence chain update.</p>
+              <div class="chipline"><span class="chip">STS -25%</span><span class="chip">Risk ++</span></div>
+            </div>
+            <div class="action">
+              <strong>Open overflow gate lane</strong>
+              <p>Temporary relief move for truck spillback at the cost of labor draw elsewhere.</p>
+              <div class="chipline"><span class="chip">Gate relief</span><span class="chip">Labor tradeoff</span></div>
+            </div>
+            <div class="action">
+              <strong>Prioritize exports</strong>
+              <p>Bias yard equipment toward prestage and quay-ready creation before the next vessel cutoff.</p>
+              <div class="chipline"><span class="chip">Rollover down</span><span class="chip">Imports wait</span></div>
+            </div>
+          </div>
+        </aside>
+
+        <div class="panel board">
+          <div class="scorebar">
+            <div class="score"><span>Terminal Score</span><strong>71</strong></div>
+            <div class="score"><span>Service Streak</span><strong>3 windows</strong></div>
+            <div class="score"><span>Bottleneck</span><strong>Gate side</strong></div>
+            <div class="score"><span>Objective</span><strong>Save exports</strong></div>
+          </div>
+
+          <div class="arena">
+            <div class="grid"></div>
+            <div class="zone anchorage"><h4>Anchorage</h4></div>
+            <div class="zone quay"><h4>Quay</h4></div>
+            <div class="zone yard"><h4>Yard clusters</h4></div>
+            <div class="zone inland"><h4>Gate lanes</h4></div>
+            <div class="zone rail"><h4>Rail staging</h4></div>
+
+            <div class="ship main">Hudson Atlas<br />discharge</div>
+            <div class="ship alt">Liberty Meridian<br />load</div>
+
+            <div class="token-cluster" style="left: 388px; top: 72px; width: 132px;">
+              <div class="cluster-title">Standard block</div>
+              <div class="dots">
+                <i style="background:#7aaa4d"></i><i style="background:#7aaa4d"></i><i style="background:#7aaa4d"></i><i style="background:#7aaa4d"></i><i style="background:#7aaa4d"></i>
+                <i style="background:#7aaa4d"></i><i style="background:#7aaa4d"></i><i style="background:#7aaa4d"></i><i style="background:#7aaa4d"></i><i style="background:#7aaa4d"></i>
+                <i style="background:#7aaa4d"></i><i style="background:#7aaa4d"></i><i style="background:#7aaa4d"></i><i style="background:#7aaa4d"></i><i style="background:#7aaa4d"></i>
+                <i style="background:#7aaa4d"></i><i style="background:#7aaa4d"></i><i style="background:#7aaa4d"></i><i style="background:#7aaa4d"></i><i style="background:#7aaa4d"></i>
+              </div>
+            </div>
+
+            <div class="token-cluster" style="left: 534px; top: 104px; width: 120px;">
+              <div class="cluster-title">Reefer</div>
+              <div class="dots">
+                <i style="background:#d8b383"></i><i style="background:#d8b383"></i><i style="background:#d8b383"></i><i style="background:#d8b383"></i><i style="background:#d8b383"></i>
+                <i style="background:#d8b383"></i><i style="background:#d8b383"></i><i style="background:#d8b383"></i><i style="background:#d8b383"></i><i style="background:#d8b383"></i>
+              </div>
+            </div>
+
+            <div class="token-cluster" style="left: 442px; top: 214px; width: 160px;">
+              <div class="cluster-title">Retrieval queue</div>
+              <div class="dots">
+                <i style="background:#355c8d"></i><i style="background:#355c8d"></i><i style="background:#355c8d"></i><i style="background:#355c8d"></i><i style="background:#355c8d"></i>
+                <i style="background:#355c8d"></i><i style="background:#355c8d"></i><i style="background:#355c8d"></i><i style="background:#355c8d"></i><i style="background:#355c8d"></i>
+                <i style="background:#355c8d"></i><i style="background:#355c8d"></i><i style="background:#355c8d"></i><i style="background:#355c8d"></i><i style="background:#355c8d"></i>
+              </div>
+            </div>
+
+            <div class="lane-card" style="left: 724px; top: 70px;">
+              <strong>Truck out</strong>
+              <div style="color:var(--muted); margin-top: 6px;">31 waiting</div>
+            </div>
+
+            <div class="lane-card" style="left: 724px; top: 236px;">
+              <strong>Train queue</strong>
+              <div style="color:var(--muted); margin-top: 6px;">16 waiting</div>
+            </div>
+
+            <div class="notice">
+              <strong>Mission pressure rising</strong>
+              <span>One crane was removed. If no action is taken, 14 exports miss the next load window.</span>
+            </div>
+          </div>
+        </div>
+
+        <aside class="panel section rightlist">
+          <h2>Consequence Ladder</h2>
+          <div class="stack">
+            <div class="action">
+              <strong>Crane removed at 13:10</strong>
+              <p>Quay throughput fell immediately.</p>
+            </div>
+            <div class="action">
+              <strong>Berth occupancy stretched</strong>
+              <p>Liberty Meridian stayed longer, delaying export opportunity.</p>
+            </div>
+            <div class="action">
+              <strong>Gate pickup pressure built</strong>
+              <p>Imports kept landing in yard while export load clearance lagged.</p>
+            </div>
+            <div class="action">
+              <strong>Export risk climbed</strong>
+              <p>14 units moved into rollover danger without further intervention.</p>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <div class="footer-back">
+        <a href="./index.html">Back to concepts</a>
+      </div>
+    </main>
+  </body>
+</html>

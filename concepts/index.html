@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sandbox Concepts</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #07111d;
+        --panel: rgba(13, 24, 39, 0.78);
+        --panel-strong: #10233a;
+        --line: rgba(164, 189, 215, 0.16);
+        --ink: #edf4fb;
+        --muted: #9db3c9;
+        --teal: #2cc8af;
+        --amber: #ffb357;
+        --coral: #ff7a59;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Avenir Next", "Segoe UI", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(44, 200, 175, 0.16), transparent 28%),
+          radial-gradient(circle at top right, rgba(255, 122, 89, 0.18), transparent 30%),
+          linear-gradient(180deg, #08111c 0%, #060d16 100%);
+      }
+
+      .shell {
+        width: min(1240px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 40px 0 56px;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: 1.3fr 0.7fr;
+        gap: 24px;
+        margin-bottom: 28px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        backdrop-filter: blur(20px);
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+      }
+
+      .hero-copy {
+        padding: 32px;
+      }
+
+      .eyebrow {
+        margin: 0 0 12px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--amber);
+        font-size: 0.78rem;
+        font-weight: 700;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(2.4rem, 5vw, 4.4rem);
+        line-height: 0.94;
+      }
+
+      .lede {
+        margin: 18px 0 0;
+        max-width: 760px;
+        line-height: 1.6;
+        color: var(--muted);
+      }
+
+      .hero-notes {
+        padding: 28px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        width: fit-content;
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--muted);
+      }
+
+      .chip::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--teal);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 20px;
+      }
+
+      .card {
+        padding: 26px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      .card h2 {
+        margin: 0;
+        font-size: 1.4rem;
+      }
+
+      .card p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      .tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .tag {
+        padding: 8px 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--ink);
+        font-size: 0.85rem;
+      }
+
+      .actions {
+        margin-top: auto;
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      a.button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 12px 16px;
+        border-radius: 16px;
+        text-decoration: none;
+        font-weight: 700;
+      }
+
+      a.primary {
+        background: linear-gradient(135deg, #174873, #0f766e);
+        color: white;
+      }
+
+      a.ghost {
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--ink);
+      }
+
+      .footer {
+        margin-top: 26px;
+        padding: 22px 26px;
+      }
+
+      .footer p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      @media (max-width: 900px) {
+        .hero,
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <div class="panel hero-copy">
+          <p class="eyebrow">Sandbox Mode Concepts</p>
+          <h1>Pick the visual language before we build the game layer.</h1>
+          <p class="lede">
+            These are standalone concept mocks for the more gamified live sandbox. Each one makes a
+            different bet on what should dominate the screen: operations control, moving flow,
+            tactical interventions, or container accumulation density.
+          </p>
+        </div>
+        <div class="panel hero-notes">
+          <div class="chip">All concepts are standalone HTML files.</div>
+          <div class="chip">They intentionally use different layout priorities.</div>
+          <div class="chip">Choose based on what you want users to notice fastest.</div>
+        </div>
+      </section>
+
+      <section class="grid">
+        <article class="panel card">
+          <h2>Option A: Control Tower</h2>
+          <p>
+            Closest to a real terminal command center. Central map, intervention deck on the left,
+            KPIs and alerts on the right, and a plot strip below. Best if you want operational
+            credibility first.
+          </p>
+          <div class="tags">
+            <span class="tag">Most balanced</span>
+            <span class="tag">Best for shared-resource logic</span>
+            <span class="tag">Low ambiguity</span>
+          </div>
+          <div class="actions">
+            <a class="button primary" href="./control-tower.html">Open Concept</a>
+          </div>
+        </article>
+
+        <article class="panel card">
+          <h2>Option B: Flow Theater</h2>
+          <p>
+            Big cinematic movement across the screen. The terminal is presented as a sequence of
+            stages with animated flow streams. Best if you want causal motion and throughput to feel
+            dramatic and intuitive.
+          </p>
+          <div class="tags">
+            <span class="tag">Most visual</span>
+            <span class="tag">Flow-first</span>
+            <span class="tag">Strong presentation mode</span>
+          </div>
+          <div class="actions">
+            <a class="button primary" href="./flow-theater.html">Open Concept</a>
+          </div>
+        </article>
+
+        <article class="panel card">
+          <h2>Option C: Tactical Board</h2>
+          <p>
+            Leans into the intervention loop. The command choices feel more like a strategy board,
+            with action cards, consequences, and mission-style priorities. Best if you want stronger
+            sandbox-game energy.
+          </p>
+          <div class="tags">
+            <span class="tag">Most gamified</span>
+            <span class="tag">Intervention-first</span>
+            <span class="tag">Great for disruption play</span>
+          </div>
+          <div class="actions">
+            <a class="button primary" href="./tactical-board.html">Open Concept</a>
+          </div>
+        </article>
+
+        <article class="panel card">
+          <h2>Option D: Yard Pressure</h2>
+          <p>
+            Built around accumulation. Queue and yard dots dominate the screen so users can see
+            buildup physically, not just numerically. Best if container pile-up is the main visual
+            metaphor you want to teach with.
+          </p>
+          <div class="tags">
+            <span class="tag">Most dot-driven</span>
+            <span class="tag">Best for congestion legibility</span>
+            <span class="tag">Strong yard focus</span>
+          </div>
+          <div class="actions">
+            <a class="button primary" href="./yard-pressure.html">Open Concept</a>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel footer">
+        <p>
+          If you want to rank them quickly: choose <strong>Control Tower</strong> for seriousness,
+          <strong>Flow Theater</strong> for narrative clarity, <strong>Tactical Board</strong> for
+          sandbox-game feel, or <strong>Yard Pressure</strong> if container accumulation should be
+          the dominant visual language.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

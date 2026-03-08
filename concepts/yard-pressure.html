@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Yard Pressure Concept</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5efe5;
+        --panel: rgba(255, 251, 246, 0.84);
+        --panel-strong: #fffaf3;
+        --ink: #17263a;
+        --muted: #647184;
+        --line: rgba(23, 38, 58, 0.12);
+        --navy: #1f4c7a;
+        --teal: #128b78;
+        --orange: #c56c2d;
+        --brick: #c8523b;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Avenir Next", "Segoe UI", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(18, 139, 120, 0.1), transparent 24%),
+          radial-gradient(circle at top right, rgba(197, 108, 45, 0.12), transparent 26%),
+          linear-gradient(180deg, #fbf6ef 0%, #f2eadf 100%);
+      }
+
+      .shell {
+        width: min(1440px, calc(100% - 34px));
+        margin: 0 auto;
+        padding: 24px 0 26px;
+      }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        align-items: end;
+        margin-bottom: 18px;
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: var(--orange);
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        font-size: 0.76rem;
+        font-weight: 700;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 3rem;
+        line-height: 0.94;
+      }
+
+      .lede {
+        margin: 10px 0 0;
+        color: var(--muted);
+        max-width: 760px;
+        line-height: 1.6;
+      }
+
+      .badges {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .badge {
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.62);
+        border: 1px solid var(--line);
+        color: var(--muted);
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 1.6fr 0.9fr;
+        gap: 16px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        border-radius: 28px;
+        box-shadow: 0 24px 60px rgba(55, 45, 36, 0.12);
+        backdrop-filter: blur(22px);
+      }
+
+      .stage {
+        padding: 18px;
+      }
+
+      .stage h2,
+      .side h2,
+      .side h3 {
+        margin: 0 0 12px;
+        font-size: 1rem;
+      }
+
+      .overview {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+
+      .stat {
+        padding: 14px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.7);
+        border: 1px solid var(--line);
+      }
+
+      .stat span {
+        display: block;
+        color: var(--muted);
+        font-size: 0.78rem;
+      }
+
+      .stat strong {
+        display: block;
+        margin-top: 6px;
+        font-size: 1.6rem;
+      }
+
+      .map {
+        display: grid;
+        grid-template-columns: 220px 1fr 220px;
+        gap: 16px;
+      }
+
+      .column {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .bin,
+      .yard-block {
+        padding: 16px;
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.68);
+        border: 1px solid var(--line);
+      }
+
+      .bin h4,
+      .yard-block h4 {
+        margin: 0 0 10px;
+        font-size: 1rem;
+      }
+
+      .bin p,
+      .yard-block p {
+        margin: 0 0 12px;
+        color: var(--muted);
+      }
+
+      .dot-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(8px, 8px));
+        gap: 7px;
+        min-height: 74px;
+      }
+
+      .dot-grid i {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: block;
+      }
+
+      .yard-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .yard-block .dot-grid {
+        min-height: 120px;
+      }
+
+      .flow-note {
+        padding: 14px 16px;
+        border-radius: 18px;
+        background: linear-gradient(135deg, rgba(31, 76, 122, 0.92), rgba(18, 139, 120, 0.9));
+        color: white;
+        margin-top: 14px;
+      }
+
+      .flow-note strong {
+        display: block;
+        margin-bottom: 6px;
+      }
+
+      .side {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .section {
+        padding: 18px;
+      }
+
+      .event {
+        padding: 12px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .event:last-child { border-bottom: 0; }
+
+      .event strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .event span {
+        color: var(--muted);
+        line-height: 1.45;
+      }
+
+      .back {
+        margin-top: 16px;
+      }
+
+      .back a {
+        color: var(--muted);
+        text-decoration: none;
+      }
+
+      @media (max-width: 1180px) {
+        .layout,
+        .map {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 880px) {
+        .overview {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="header">
+        <div>
+          <p class="eyebrow">Option D</p>
+          <h1>Yard Pressure</h1>
+          <p class="lede">
+            This direction is built around the physical accumulation of units. Small dots dominate
+            queues and yard blocks so the user can feel congestion and depletion directly, not just
+            read it in metrics.
+          </p>
+        </div>
+        <div class="badges">
+          <div class="badge">Best for buildup visibility</div>
+          <div class="badge">Strongest dot metaphor</div>
+          <div class="badge">Yard-centric</div>
+        </div>
+      </header>
+
+      <section class="layout">
+        <div class="panel stage">
+          <div class="overview">
+            <div class="stat"><span>Yard fill</span><strong>78%</strong></div>
+            <div class="stat"><span>Gate queue</span><strong>31</strong></div>
+            <div class="stat"><span>Rail queue</span><strong>16</strong></div>
+            <div class="stat"><span>At-risk exports</span><strong>14</strong></div>
+          </div>
+
+          <div class="map">
+            <div class="column">
+              <div class="bin">
+                <h4>Anchorage</h4>
+                <p>Surprise arrivals stacking up before berth release.</p>
+                <div class="dot-grid">
+                  <i style="background: var(--navy)"></i><i style="background: var(--navy)"></i><i style="background: var(--navy)"></i><i style="background: var(--navy)"></i><i style="background: var(--navy)"></i><i style="background: var(--navy)"></i>
+                </div>
+              </div>
+
+              <div class="bin">
+                <h4>Truck pickup queue</h4>
+                <p>Each dot is a waiting pickup slot.</p>
+                <div class="dot-grid">
+                  <i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i>
+                  <i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i>
+                  <i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i>
+                </div>
+              </div>
+            </div>
+
+            <div class="yard-stack">
+              <div class="yard-block">
+                <h4>Standard block</h4>
+                <p>184 / 240 TEU. Dots are dense enough to suggest stack burial.</p>
+                <div class="dot-grid">
+                  <i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i>
+                  <i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i>
+                  <i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i>
+                  <i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i><i style="background: var(--teal)"></i>
+                </div>
+              </div>
+
+              <div class="yard-block">
+                <h4>Reefer + hazardous support</h4>
+                <p>Smaller blocks still visibly rise when the yard gets pressured.</p>
+                <div class="dot-grid">
+                  <i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i><i style="background: var(--orange)"></i>
+                  <i style="background: var(--brick)"></i><i style="background: var(--brick)"></i><i style="background: var(--brick)"></i><i style="background: var(--brick)"></i><i style="background: var(--brick)"></i><i style="background: var(--brick)"></i>
+                </div>
+              </div>
+
+              <div class="flow-note">
+                <strong>What this view teaches well</strong>
+                A single crane loss or surprise vessel makes the dots physically spread into quay,
+                yard, gate, and rail zones. The user sees pressure accumulate instead of inferring it.
+              </div>
+            </div>
+
+            <div class="column">
+              <div class="bin">
+                <h4>Quay-ready exports</h4>
+                <p>Small, visible buffer before loading.</p>
+                <div class="dot-grid">
+                  <i style="background: var(--navy)"></i><i style="background: var(--navy)"></i><i style="background: var(--navy)"></i><i style="background: var(--navy)"></i><i style="background: var(--navy)"></i><i style="background: var(--navy)"></i>
+                  <i style="background: var(--navy)"></i><i style="background: var(--navy)"></i><i style="background: var(--navy)"></i>
+                </div>
+              </div>
+
+              <div class="bin">
+                <h4>Rail departure queue</h4>
+                <p>Dots clear sharply when the next train leaves.</p>
+                <div class="dot-grid">
+                  <i style="background: var(--navy)"></i><i style="background: var(--navy)"></i><i style="background: var(--navy)"></i><i style="background: var(--navy)"></i><i style="background: var(--navy)"></i><i style="background: var(--navy)"></i><i style="background: var(--navy)"></i><i style="background: var(--navy)"></i>
+                  <i style="background: var(--navy)"></i><i style="background: var(--navy)"></i><i style="background: var(--navy)"></i><i style="background: var(--navy)"></i><i style="background: var(--navy)"></i><i style="background: var(--navy)"></i><i style="background: var(--navy)"></i><i style="background: var(--navy)"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="side">
+          <div class="panel section">
+            <h2>Best uses</h2>
+            <div class="event">
+              <strong>Teaching accumulation</strong>
+              <span>Users immediately understand what congestion means because they can see it occupy space.</span>
+            </div>
+            <div class="event">
+              <strong>Explaining yard policy</strong>
+              <span>Great fit if stacking logic and retrieval slowdown are central to the product story.</span>
+            </div>
+            <div class="event">
+              <strong>Weaker for fine resource logic</strong>
+              <span>More abstract around individual cranes and berth sequencing than Control Tower.</span>
+            </div>
+          </div>
+
+          <div class="panel section">
+            <h3>Example interventions</h3>
+            <div class="event">
+              <strong>Add vessel</strong>
+              <span>More blue dots land in yard, then orange dots rise at the truck side later.</span>
+            </div>
+            <div class="event">
+              <strong>Remove crane</strong>
+              <span>Quay-ready export dots stop clearing, and risk dots spread into the side panels.</span>
+            </div>
+            <div class="event">
+              <strong>Open gate overtime</strong>
+              <span>Truck queue dots thin first, then yard block density slowly relaxes.</span>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <div class="back">
+        <a href="./index.html">Back to concepts</a>
+      </div>
+    </main>
+  </body>
+</html>
