@@ -5,14 +5,11 @@
   }
 
   const SLOT_POSITIONS = [0.15, 0.38, 0.61, 0.84];
+  const HISTORY_POINTS = 18;
   const HISTORY_KEYS = ["berth", "cranes", "forklifts", "yard", "gates"];
-  const VESSEL_PATTERNS = [
-    { imports: 40, exports: 20 },
-    { imports: 18, exports: 42 },
-    { imports: 34, exports: 26 },
-    { imports: 24, exports: 36 },
-  ];
-  const ARRIVAL_GAPS = [3.6, 5.1, 4.2, 5.7];
+  const FIXED_VESSEL_LOAD = { imports: 36, exports: 24 };
+  const AUTO_VESSEL_GAP_HOURS = 4.5;
+  const TRUCK_UNITS = 4;
 
   const state = {
     concept: document.body.dataset.concept || "Dock Playfield",
@@ -29,6 +26,10 @@
     nextTruckId: 1,
     vessels: [],
     trucks: [],
+    yardCohorts: {
+      import: [],
+      export: [],
+    },
     pendingImportOut: 0,
     pendingExportIn: 0,
     importDemandCarry: 0,
@@ -59,6 +60,9 @@
       renderedGateCount: 0,
       trucksMoving: 0,
       hotLayer: "None",
+      dwellBerth: 0,
+      dwellYard: 0,
+      dwellGate: 0,
     },
   };
 
@@ -98,6 +102,12 @@
     trucksValue: document.getElementById("trucks-value"),
     yardValue: document.getElementById("yard-value"),
     pressureValue: document.getElementById("pressure-value"),
+    dwellBerth: document.getElementById("dwell-berth"),
+    dwellYard: document.getElementById("dwell-yard"),
+    dwellGate: document.getElementById("dwell-gate"),
+    dwellBerthBar: document.getElementById("dwell-berth-bar"),
+    dwellYardBar: document.getElementById("dwell-yard-bar"),
+    dwellGateBar: document.getElementById("dwell-gate-bar"),
     importStream: document.getElementById("import-stream"),
     exportStream: document.getElementById("export-stream"),
   };
@@ -119,24 +129,20 @@
     return `${prefix} ${Math.max(0, Math.round(value))}`;
   }
 
-  function nextArrivalGap() {
-    return ARRIVAL_GAPS[(state.nextVesselId - 1) % ARRIVAL_GAPS.length];
-  }
-
   function createVessel(initialMode) {
-    const pattern = VESSEL_PATTERNS[(state.nextVesselId - 1) % VESSEL_PATTERNS.length];
     const vessel = {
       id: `V${state.nextVesselId++}`,
       hiddenLoad: 60,
-      importsRemaining: pattern.imports,
-      exportsRemaining: pattern.exports,
+      importsRemaining: FIXED_VESSEL_LOAD.imports,
+      exportsRemaining: FIXED_VESSEL_LOAD.exports,
       phase: "approach",
-      workMode: initialMode || (pattern.imports >= pattern.exports ? "import" : "export"),
+      workMode: initialMode || "import",
       slotIndex: null,
       position: -0.24,
       waitingAnchor: 0.03,
       assignedCranes: 0,
       createdAt: state.timeHours,
+      berthStartedAt: null,
     };
     return vessel;
   }
@@ -165,6 +171,10 @@
     state.exportYard = 0;
     state.vessels = [];
     state.trucks = [];
+    state.yardCohorts = {
+      import: [],
+      export: [],
+    };
     state.pendingImportOut = 0;
     state.pendingExportIn = 0;
     state.importDemandCarry = 0;
@@ -195,6 +205,9 @@
       renderedGateCount: 0,
       trucksMoving: 0,
       hotLayer: "None",
+      dwellBerth: 0,
+      dwellYard: 0,
+      dwellGate: 0,
     };
     seedHistory();
   }
@@ -202,12 +215,17 @@
   function seedState() {
     state.importYard = 84;
     state.exportYard = 56;
+    state.yardCohorts = {
+      import: [{ units: 84, enteredAt: state.timeHours - 1.8 }],
+      export: [{ units: 56, enteredAt: state.timeHours - 2.4 }],
+    };
     const first = createVessel("import");
     first.phase = "berthed";
     first.slotIndex = 0;
     first.position = SLOT_POSITIONS[0];
     first.importsRemaining = 32;
     first.exportsRemaining = 20;
+    first.berthStartedAt = state.timeHours - 1.4;
 
     const second = createVessel("export");
     second.phase = "berthed";
@@ -215,6 +233,7 @@
     second.position = SLOT_POSITIONS[1];
     second.importsRemaining = 0;
     second.exportsRemaining = 28;
+    second.berthStartedAt = state.timeHours - 0.9;
 
     state.vessels = [first, second];
     seedHistory();
@@ -222,8 +241,44 @@
 
   function seedHistory() {
     for (const key of HISTORY_KEYS) {
-      state.histories[key] = Array.from({ length: 12 }, () => 0.05);
+      state.histories[key] = Array.from({ length: HISTORY_POINTS }, () => 0.05);
     }
+  }
+
+  function addYardCohort(kind, units, enteredAt) {
+    if (units <= 0.001) {
+      return;
+    }
+    const cohorts = state.yardCohorts[kind];
+    const last = cohorts[cohorts.length - 1];
+    if (last && Math.abs(last.enteredAt - enteredAt) < 0.05) {
+      last.units += units;
+      return;
+    }
+    cohorts.push({ units, enteredAt });
+  }
+
+  function consumeYardUnits(kind, units) {
+    let remaining = units;
+    const cohorts = state.yardCohorts[kind];
+    while (remaining > 0.001 && cohorts.length) {
+      const cohort = cohorts[0];
+      const taken = Math.min(cohort.units, remaining);
+      cohort.units -= taken;
+      remaining -= taken;
+      if (cohort.units <= 0.001) {
+        cohorts.shift();
+      }
+    }
+  }
+
+  function averageAgeFromCohorts(cohorts, nowHours) {
+    const totalUnits = cohorts.reduce((sum, cohort) => sum + cohort.units, 0);
+    if (!totalUnits) {
+      return 0;
+    }
+    const weightedAge = cohorts.reduce((sum, cohort) => sum + (nowHours - cohort.enteredAt) * cohort.units, 0);
+    return weightedAge / totalUnits;
   }
 
   function reservedBerthSlots() {
@@ -310,6 +365,7 @@
         if (vessel.slotIndex !== null && Math.abs(vessel.position - target) < 0.012) {
           vessel.position = target;
           vessel.phase = "berthed";
+          vessel.berthStartedAt = state.timeHours;
         }
         return;
       }
@@ -327,6 +383,7 @@
           vessel.importsRemaining -= moved;
           importMoved += moved;
           state.importYard += moved;
+          addYardCohort("import", moved, state.timeHours);
           vessel.workMode = "import";
           return;
         }
@@ -335,6 +392,7 @@
           const moved = Math.min(vessel.exportsRemaining, state.exportYard, rate * 0.92 * simHours);
           vessel.exportsRemaining -= moved;
           state.exportYard = Math.max(0, state.exportYard - moved);
+          consumeYardUnits("export", moved);
           exportMoved += moved;
           vessel.workMode = "export";
           return;
@@ -411,11 +469,13 @@
         laneIndex,
         y: kind === "export" ? 96 : 14,
         serviceRemaining: 0.46,
+        gateEnteredAt: state.timeHours,
       };
 
       if (kind === "import") {
         state.pendingImportOut = Math.max(0, state.pendingImportOut - 1);
-        state.importYard = Math.max(0, state.importYard - 4);
+        state.importYard = Math.max(0, state.importYard - TRUCK_UNITS);
+        consumeYardUnits("import", TRUCK_UNITS);
       } else {
         state.pendingExportIn = Math.max(0, state.pendingExportIn - 1);
       }
@@ -451,7 +511,8 @@
         truck.serviceRemaining -= simHours;
         if (truck.serviceRemaining <= 0) {
           if (truck.kind === "export") {
-            state.exportYard += 4;
+            state.exportYard += TRUCK_UNITS;
+            addYardCohort("export", TRUCK_UNITS, state.timeHours);
             truck.phase = "handoff";
           } else {
             truck.phase = "depart";
@@ -481,7 +542,7 @@
     state.timeToNextVessel -= simHours;
     if (state.timeToNextVessel <= 0) {
       addVessel();
-      state.timeToNextVessel = nextArrivalGap();
+      state.timeToNextVessel = AUTO_VESSEL_GAP_HOURS;
     }
   }
 
@@ -505,6 +566,22 @@
 
     const topLayer = layerScores.sort((left, right) => right.score - left.score)[0];
     state.metrics.hotLayer = topLayer && topLayer.score > 0.02 ? topLayer.name : "None";
+
+    const berthedUnits = state.vessels
+      .filter((vessel) => vessel.phase === "berthed" && vessel.berthStartedAt !== null)
+      .map((vessel) => ({
+        units: vessel.importsRemaining + vessel.exportsRemaining,
+        age: state.timeHours - vessel.berthStartedAt,
+      }));
+    const berthUnits = berthedUnits.reduce((sum, item) => sum + item.units, 0);
+    state.metrics.dwellBerth = berthUnits
+      ? berthedUnits.reduce((sum, item) => sum + item.units * item.age, 0) / berthUnits
+      : 0;
+    state.metrics.dwellYard = averageAgeFromCohorts([...state.yardCohorts.import, ...state.yardCohorts.export], state.timeHours);
+    const gateUnits = state.trucks.length * TRUCK_UNITS;
+    state.metrics.dwellGate = gateUnits
+      ? state.trucks.reduce((sum, truck) => sum + (state.timeHours - truck.gateEnteredAt) * TRUCK_UNITS, 0) / gateUnits
+      : 0;
   }
 
   function refreshDerivedState() {
@@ -580,6 +657,18 @@
       bar.style.height = `${Math.round(bounded * 38)}px`;
       target.appendChild(bar);
     });
+  }
+
+  function renderDwell(targetValue, targetBar, hours) {
+    if (targetValue) {
+      targetValue.textContent = `${hours.toFixed(1)}h`;
+    }
+    if (!targetBar) {
+      return;
+    }
+    const normalized = clamp(hours / 6, 0, 1);
+    targetBar.style.transform = `scaleX(${normalized})`;
+    targetBar.classList.toggle("hot", hours > 3.5);
   }
 
   function renderBerthSlots() {
@@ -788,6 +877,9 @@
     if (controls.yardCount) controls.yardCount.textContent = `${Math.round(state.importYard + state.exportYard)} of ${state.yardCapacity}`;
     if (controls.yardValue) controls.yardValue.textContent = `${Math.round(state.importYard + state.exportYard)} / ${state.yardCapacity}`;
     if (controls.pressureValue) controls.pressureValue.textContent = state.metrics.hotLayer;
+    renderDwell(controls.dwellBerth, controls.dwellBerthBar, state.metrics.dwellBerth);
+    renderDwell(controls.dwellYard, controls.dwellYardBar, state.metrics.dwellYard);
+    renderDwell(controls.dwellGate, controls.dwellGateBar, state.metrics.dwellGate);
   }
 
   function stepSimulation(seconds) {
@@ -854,6 +946,11 @@
       flows: {
         imports_down: clamp(Math.round(state.recentImportFlow), 0, 18),
         exports_up: clamp(Math.round(state.recentExportFlow), 0, 18),
+      },
+      dwell_hours: {
+        berth: Number(state.metrics.dwellBerth.toFixed(2)),
+        yard: Number(state.metrics.dwellYard.toFixed(2)),
+        gate: Number(state.metrics.dwellGate.toFixed(2)),
       },
       hot_layer: state.metrics.hotLayer,
     });

@@ -37,3 +37,12 @@ Do you get my point? Try new candidates
   - `node --check concepts-v2/dock-playfield.js`
   - Playwright screenshot pass for updated Candidate C
   - direct Playwright state checks for `add-vessel`, `dec-gates`, speed changes, and `reset`
+
+- Further Candidate C iteration:
+  - widened the inline history bars from 12 to 18 bins and gave them more horizontal space
+  - made automatic vessel arrivals fixed-interval / deterministic
+  - added live dwell-by-section for berth, yard, and gate based on aggregate container cohorts
+  - kept dwell updating in real time through `render_game_to_text` and UI updates
+- Additional verification:
+  - Playwright screenshot pass after dwell/history-bar changes
+  - direct Playwright state check showing dwell values changing after `advanceTime`

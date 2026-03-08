@@ -25,8 +25,10 @@ Notes:
 - Candidate C models:
   - vessels arriving fast from the left, holding a berth while worked, then departing fast right
   - export trucks entering through gates and import trucks leaving through gates
+  - deterministic auto vessel arrivals
   - queue pills as over-capacity counts, not generic activity counts
-  - inline recent-usage mini charts for berth, crane, forklift, yard, and gate layers
+  - wider inline recent-usage mini charts for berth, crane, forklift, yard, and gate layers
+  - live dwell-by-section readouts for berth, yard, and gate
   - layer tinting by utilization / pressure
 
 Open them directly in a browser, or run a local server from the repo root:
