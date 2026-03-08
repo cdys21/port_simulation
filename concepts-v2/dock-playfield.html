@@ -10,7 +10,7 @@
         --bg: #101116;
         --panel: rgba(25, 27, 35, 0.86);
         --panel-strong: rgba(32, 35, 45, 0.94);
-        --line: rgba(255,255,255,0.1);
+        --line: rgba(255, 255, 255, 0.1);
         --ink: #f8f1e7;
         --muted: #b8b0a5;
         --blue: #648bff;
@@ -18,19 +18,21 @@
         --amber: #ffb964;
         --rose: #ff7d66;
       }
-      * { box-sizing: border-box; }
+      * {
+        box-sizing: border-box;
+      }
       body {
         margin: 0;
         min-height: 100vh;
         font-family: "Avenir Next", "Trebuchet MS", sans-serif;
         color: var(--ink);
         background:
-          radial-gradient(circle at top left, rgba(100,139,255,0.12), transparent 20%),
-          radial-gradient(circle at bottom right, rgba(255,125,102,0.12), transparent 22%),
+          radial-gradient(circle at top left, rgba(100, 139, 255, 0.12), transparent 20%),
+          radial-gradient(circle at bottom right, rgba(255, 125, 102, 0.12), transparent 22%),
           linear-gradient(180deg, #14151b 0%, #0d0d11 100%);
       }
       .shell {
-        width: min(1440px, calc(100% - 32px));
+        width: min(1460px, calc(100% - 32px));
         margin: 0 auto;
         padding: 18px 0 24px;
       }
@@ -49,8 +51,17 @@
         font-size: 0.74rem;
         font-weight: 700;
       }
-      h1 { margin: 0; font-size: 2.8rem; line-height: 0.94; }
-      .lede { margin: 10px 0 0; color: var(--muted); max-width: 760px; line-height: 1.55; }
+      h1 {
+        margin: 0;
+        font-size: 2.8rem;
+        line-height: 0.94;
+      }
+      .lede {
+        margin: 10px 0 0;
+        color: var(--muted);
+        max-width: 760px;
+        line-height: 1.55;
+      }
       .layout {
         display: grid;
         grid-template-columns: minmax(0, 1fr) 320px;
@@ -60,9 +71,11 @@
         background: var(--panel);
         border: 1px solid var(--line);
         border-radius: 30px;
-        box-shadow: 0 22px 56px rgba(0,0,0,0.28);
+        box-shadow: 0 22px 56px rgba(0, 0, 0, 0.28);
       }
-      .board { padding: 18px; }
+      .board {
+        padding: 18px;
+      }
       .board-top {
         display: flex;
         justify-content: space-between;
@@ -70,30 +83,37 @@
         gap: 16px;
         margin-bottom: 14px;
       }
-      .chipline { display: flex; gap: 8px; flex-wrap: wrap; }
+      .chipline {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
       .chip {
         padding: 8px 12px;
         border-radius: 999px;
-        background: rgba(255,255,255,0.06);
+        background: rgba(255, 255, 255, 0.06);
         color: var(--muted);
       }
       .playfield {
         position: relative;
-        min-height: 790px;
+        min-height: 840px;
         border-radius: 28px;
         background:
-          linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02)),
-          radial-gradient(circle at center, rgba(255,255,255,0.04), transparent 48%);
+          linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.02)),
+          radial-gradient(circle at center, rgba(255, 255, 255, 0.04), transparent 48%);
         overflow: hidden;
         padding: 18px;
       }
       .flow-overlay {
         position: absolute;
-        inset: 136px 34px 130px 34px;
+        inset: 146px 34px 132px 34px;
         pointer-events: none;
         overflow: hidden;
       }
-      .stream { position: absolute; inset: 0; }
+      .stream {
+        position: absolute;
+        inset: 0;
+      }
       .flow-dot {
         position: absolute;
         width: 12px;
@@ -101,25 +121,120 @@
         border-radius: 50%;
         opacity: 0.94;
       }
-      .flow-dot.import { top: -18px; background: var(--blue); animation: down 3.6s linear infinite; }
-      .flow-dot.export { bottom: -18px; background: var(--amber); animation: up 3.1s linear infinite; }
+      .flow-dot.import {
+        top: -18px;
+        background: var(--blue);
+        animation: down 2.8s linear infinite;
+      }
+      .flow-dot.export {
+        bottom: -18px;
+        background: var(--amber);
+        animation: up 2.8s linear infinite;
+      }
       .zone {
         border-radius: 26px;
         border: 1px solid var(--line);
         background: var(--panel-strong);
         padding: 16px;
         margin-bottom: 12px;
+        transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
       }
-      .zone:last-child { margin-bottom: 0; }
+      .zone:last-child {
+        margin-bottom: 0;
+      }
+      .zone.util-low {
+        border-color: rgba(255, 255, 255, 0.08);
+      }
+      .zone.util-med {
+        border-color: rgba(100, 139, 255, 0.3);
+        box-shadow: inset 0 0 0 1px rgba(100, 139, 255, 0.08);
+      }
+      .zone.util-high {
+        border-color: rgba(255, 185, 100, 0.34);
+        box-shadow: inset 0 0 0 1px rgba(255, 185, 100, 0.08);
+      }
+      .zone.util-over {
+        border-color: rgba(255, 125, 102, 0.45);
+        background: linear-gradient(180deg, rgba(255, 125, 102, 0.08), rgba(255, 255, 255, 0.02));
+        box-shadow: inset 0 0 0 1px rgba(255, 125, 102, 0.14);
+      }
       .zone-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        gap: 12px;
+        gap: 16px;
         margin-bottom: 12px;
       }
-      .zone-header strong { font-size: 1rem; }
-      .zone-header span { color: var(--muted); }
+      .zone-title {
+        display: grid;
+        gap: 4px;
+      }
+      .zone-title strong {
+        font-size: 1rem;
+      }
+      .zone-title span {
+        color: var(--muted);
+      }
+      .zone-tools {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .queue-pill {
+        min-width: 88px;
+        padding: 8px 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--muted);
+        text-align: center;
+        font-size: 0.82rem;
+      }
+      .queue-pill.active {
+        background: rgba(255, 125, 102, 0.14);
+        color: var(--rose);
+      }
+      .history-strip {
+        width: 112px;
+        height: 42px;
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 4px;
+        align-items: end;
+      }
+      .history-bar {
+        border-radius: 999px 999px 4px 4px;
+        background: linear-gradient(180deg, rgba(76, 203, 152, 0.86), rgba(100, 139, 255, 0.9));
+        min-height: 6px;
+        opacity: 0.94;
+      }
+      .history-bar.hot {
+        background: linear-gradient(180deg, rgba(255, 185, 100, 0.9), rgba(255, 125, 102, 0.9));
+      }
+      .mini-controls {
+        display: flex;
+        justify-content: end;
+        gap: 8px;
+      }
+      button {
+        border: 0;
+        border-radius: 14px;
+        padding: 10px 12px;
+        cursor: pointer;
+        font: inherit;
+      }
+      .ghost {
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--ink);
+      }
+      .primary {
+        background: linear-gradient(135deg, #5a63d8, #3dbf83);
+        color: white;
+        font-weight: 700;
+      }
+      .selected {
+        background: var(--ink);
+        color: #111116;
+      }
       .berth-slots {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -129,29 +244,63 @@
       .berth-slot {
         padding: 12px;
         border-radius: 18px;
-        background: rgba(255,255,255,0.04);
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.04);
       }
-      .berth-slot strong { display: block; }
-      .berth-slot span { color: var(--muted); font-size: 0.8rem; }
+      .berth-slot strong {
+        display: block;
+      }
+      .berth-slot span {
+        color: var(--muted);
+        font-size: 0.8rem;
+      }
+      .berth-slot.occupied.import {
+        border-color: rgba(100, 139, 255, 0.36);
+        background: rgba(100, 139, 255, 0.12);
+      }
+      .berth-slot.occupied.export {
+        border-color: rgba(255, 185, 100, 0.34);
+        background: rgba(255, 185, 100, 0.12);
+      }
       .vessel-track {
         position: relative;
-        height: 62px;
-        border-radius: 20px;
-        background: rgba(255,255,255,0.03);
+        height: 88px;
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.03);
+        overflow: hidden;
       }
       .vessel {
         position: absolute;
-        min-width: 96px;
-        padding: 11px 12px;
+        min-width: 104px;
+        padding: 10px 12px;
         border-radius: 16px;
-        background: linear-gradient(135deg, #4a6bdb, #2c438e);
-        box-shadow: 0 14px 22px rgba(0,0,0,0.24);
+        box-shadow: 0 14px 22px rgba(0, 0, 0, 0.24);
+        transform: translate(-50%, -50%);
       }
-      .vessel strong { display: block; font-size: 0.84rem; }
-      .vessel span { color: rgba(255,255,255,0.76); font-size: 0.72rem; }
+      .vessel strong {
+        display: block;
+        font-size: 0.84rem;
+      }
+      .vessel span {
+        color: rgba(255, 255, 255, 0.76);
+        font-size: 0.72rem;
+      }
+      .vessel.approach,
+      .vessel.departing {
+        background: linear-gradient(135deg, #5f72e6, #334b9a);
+      }
+      .vessel.berthed.import {
+        background: linear-gradient(135deg, #4e72ff, #3150b1);
+      }
+      .vessel.berthed.export {
+        background: linear-gradient(135deg, #ffbb72, #ca7e2c);
+      }
+      .vessel.waiting {
+        background: linear-gradient(135deg, #55586c, #2e3243);
+      }
       .resource-band {
         display: grid;
-        grid-template-columns: 220px minmax(0, 1fr) 140px;
+        grid-template-columns: 200px minmax(0, 1fr) 240px;
         gap: 12px;
         align-items: center;
       }
@@ -165,28 +314,27 @@
         border-radius: 14px;
         text-align: center;
         font-weight: 700;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--muted);
       }
-      .resource-cell.active { background: rgba(76,203,152,0.16); color: var(--teal); }
-      .resource-cell.idle { background: rgba(255,255,255,0.04); color: var(--muted); }
-      .mini-controls {
+      .resource-cell.active {
+        background: rgba(76, 203, 152, 0.16);
+        color: var(--teal);
+      }
+      .resource-cell.saturated {
+        background: rgba(255, 185, 100, 0.16);
+        color: var(--amber);
+      }
+      .resource-tools {
         display: flex;
         justify-content: end;
-        gap: 8px;
+        align-items: center;
+        gap: 10px;
       }
-      button {
-        border: 0;
-        border-radius: 14px;
-        padding: 10px 12px;
-        cursor: pointer;
-        font: inherit;
-      }
-      .ghost { background: rgba(255,255,255,0.06); color: var(--ink); }
-      .primary { background: linear-gradient(135deg, #5a63d8, #3dbf83); color: white; font-weight: 700; }
-      .selected { background: var(--ink); color: #111116; }
       .yard-box {
         min-height: 186px;
         border-radius: 22px;
-        background: rgba(255,255,255,0.03);
+        background: rgba(255, 255, 255, 0.03);
         padding: 14px;
         display: grid;
         grid-template-columns: repeat(14, minmax(0, 1fr));
@@ -198,43 +346,195 @@
         border-radius: 50%;
         background: linear-gradient(135deg, var(--teal), var(--blue));
       }
-      .side { padding: 18px; }
-      .side h2, .side h3 { margin: 0 0 12px; font-size: 1rem; }
+      .yard-dot.export {
+        background: linear-gradient(135deg, var(--amber), #ff8f5f);
+      }
+      .yard-dot.overflow {
+        background: linear-gradient(135deg, var(--rose), #ffd0c8);
+      }
+      .gate-wrap {
+        display: grid;
+        gap: 12px;
+      }
+      .gate-lanes {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        gap: 10px;
+      }
+      .gate-lane {
+        min-height: 82px;
+        padding: 12px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.04);
+        display: grid;
+        align-content: space-between;
+      }
+      .gate-lane strong {
+        display: block;
+      }
+      .gate-lane span {
+        color: var(--muted);
+        font-size: 0.8rem;
+      }
+      .gate-lane.active.import {
+        border-color: rgba(100, 139, 255, 0.36);
+        background: rgba(100, 139, 255, 0.12);
+      }
+      .gate-lane.active.export {
+        border-color: rgba(255, 185, 100, 0.34);
+        background: rgba(255, 185, 100, 0.12);
+      }
+      .truck-road {
+        position: relative;
+        height: 132px;
+        border-radius: 20px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01)),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0));
+        overflow: hidden;
+      }
+      .truck-road::before,
+      .truck-road::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .truck-road::before {
+        top: 28px;
+      }
+      .truck-road::after {
+        bottom: 24px;
+      }
+      .truck {
+        position: absolute;
+        width: 54px;
+        padding: 7px 0;
+        border-radius: 999px;
+        font-size: 0.74rem;
+        font-weight: 700;
+        text-align: center;
+        transform: translate(-50%, -50%);
+        box-shadow: 0 12px 20px rgba(0, 0, 0, 0.22);
+      }
+      .truck.import {
+        background: rgba(100, 139, 255, 0.92);
+        color: white;
+      }
+      .truck.export {
+        background: rgba(255, 185, 100, 0.94);
+        color: #23170b;
+      }
+      .truck.service {
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.16), 0 12px 20px rgba(0, 0, 0, 0.22);
+      }
+      .side {
+        padding: 18px;
+      }
+      .side h2,
+      .side h3 {
+        margin: 0 0 12px;
+        font-size: 1rem;
+      }
       .card {
         padding: 14px;
         border-radius: 18px;
-        background: rgba(255,255,255,0.05);
-        border: 1px solid rgba(255,255,255,0.06);
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.06);
         margin-bottom: 12px;
       }
-      .card strong { display: block; margin-bottom: 8px; }
-      .card p, .card span { margin: 0; color: var(--muted); line-height: 1.5; }
-      .speed-row, .control-row { display: flex; gap: 8px; flex-wrap: wrap; }
-      .back { margin-top: 14px; }
-      .back a { color: var(--muted); text-decoration: none; }
-      @keyframes down { to { transform: translateY(100%); } }
-      @keyframes up { to { transform: translateY(-100%); } }
+      .card strong {
+        display: block;
+        margin-bottom: 8px;
+      }
+      .card p,
+      .card span {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+      .speed-row,
+      .control-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .mini-stat {
+        padding: 12px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .mini-stat span {
+        display: block;
+        color: var(--muted);
+        font-size: 0.8rem;
+      }
+      .mini-stat strong {
+        display: block;
+        margin-top: 6px;
+        font-size: 1.24rem;
+      }
+      .back {
+        margin-top: 14px;
+      }
+      .back a {
+        color: var(--muted);
+        text-decoration: none;
+      }
+      @keyframes down {
+        to {
+          transform: translateY(100%);
+        }
+      }
+      @keyframes up {
+        to {
+          transform: translateY(-100%);
+        }
+      }
       @media (max-width: 1180px) {
-        .layout { grid-template-columns: 1fr; }
-        .resource-band { grid-template-columns: 1fr; }
+        .layout {
+          grid-template-columns: 1fr;
+        }
+        .resource-band {
+          grid-template-columns: 1fr;
+        }
+        .zone-header {
+          align-items: start;
+          flex-direction: column;
+        }
+        .zone-tools,
+        .resource-tools {
+          width: 100%;
+          justify-content: start;
+          flex-wrap: wrap;
+        }
       }
     </style>
   </head>
   <body data-concept="Dock Playfield">
-    <main class="shell" data-live-ops>
+    <main class="shell" data-dock-playfield>
       <header class="header">
         <div>
           <p class="eyebrow">Candidate C</p>
           <h1>Dock Playfield</h1>
           <p class="lede">
-            Still true to the same flow model, but with slightly more board-game energy. This one
-            keeps the layers while making the sandbox feel more alive and less like a monitoring UI.
+            The more game-like version now behaves like a real layered live-ops board: vessels snap
+            into berths, trucks enter and leave through gates, queues mean over-capacity pressure,
+            and every layer shows its recent utilization history.
           </p>
         </div>
         <div class="chipline">
           <div class="chip">Most playful</div>
-          <div class="chip">Still directional</div>
-          <div class="chip">Good hybrid option</div>
+          <div class="chip">Directional flow preserved</div>
+          <div class="chip">Layer pressure visible</div>
         </div>
       </header>
 
@@ -242,13 +542,13 @@
         <div class="panel board">
           <div class="board-top">
             <div>
-              <p class="eyebrow" style="margin-bottom:6px;">Continuous Live Ops</p>
-              <strong id="clock" style="font-size:1.6rem;">D0 00:00</strong>
+              <p class="eyebrow" style="margin-bottom: 6px;">Continuous Live Ops</p>
+              <strong id="clock" style="font-size: 1.6rem;">D0 00:00</strong>
             </div>
             <div class="chipline">
               <div class="chip">Speed <strong id="speed-value">8x</strong></div>
-              <div class="chip">Imports <strong id="import-value">0 active lanes down</strong></div>
-              <div class="chip">Exports <strong id="export-value">0 active lanes up</strong></div>
+              <div class="chip">Imports <strong id="import-value">0 down</strong></div>
+              <div class="chip">Exports <strong id="export-value">0 up</strong></div>
             </div>
           </div>
 
@@ -258,62 +558,93 @@
               <div class="stream" id="export-stream"></div>
             </div>
 
-            <div class="zone">
+            <div class="zone util-low" id="berth-zone">
               <div class="zone-header">
-                <strong>Berth spaces</strong>
-                <span>left arrival | right departure</span>
+                <div class="zone-title">
+                  <strong>Berth spaces</strong>
+                  <span id="berth-meta">0/4 occupied, arrivals left and departures right</span>
+                </div>
+                <div class="zone-tools">
+                  <div class="queue-pill" id="berth-queue">Queue 0</div>
+                  <div class="history-strip" id="berth-history"></div>
+                  <div class="mini-controls">
+                    <button class="ghost" data-action="remove-vessel">-</button>
+                    <button class="ghost" data-action="add-vessel">+</button>
+                  </div>
+                </div>
               </div>
               <div class="berth-slots" id="berth-slots"></div>
               <div class="vessel-track" id="vessel-track"></div>
             </div>
 
-            <div class="zone">
+            <div class="zone util-low" id="crane-zone">
               <div class="resource-band">
-                <div class="zone-header" style="margin:0; display:block;">
+                <div class="zone-title">
                   <strong>Crane layer</strong>
-                  <span id="cranes-value">0/0</span>
+                  <span id="cranes-value">0/0 active</span>
                 </div>
                 <div class="resource-cells" id="crane-cells"></div>
-                <div class="mini-controls">
-                  <button class="ghost" data-action="dec-cranes">-</button>
-                  <button class="ghost" data-action="inc-cranes">+</button>
+                <div class="resource-tools">
+                  <div class="queue-pill" id="crane-queue">Queue 0</div>
+                  <div class="history-strip" id="crane-history"></div>
+                  <div class="mini-controls">
+                    <button class="ghost" data-action="dec-cranes">-</button>
+                    <button class="ghost" data-action="inc-cranes">+</button>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div class="zone">
+            <div class="zone util-low" id="forklift-zone">
               <div class="resource-band">
-                <div class="zone-header" style="margin:0; display:block;">
+                <div class="zone-title">
                   <strong>Forklift layer</strong>
-                  <span id="forklifts-value">0/0</span>
+                  <span id="forklifts-value">0/0 active</span>
                 </div>
                 <div class="resource-cells" id="forklift-cells"></div>
-                <div class="mini-controls">
-                  <button class="ghost" data-action="dec-forklifts">-</button>
-                  <button class="ghost" data-action="inc-forklifts">+</button>
+                <div class="resource-tools">
+                  <div class="queue-pill" id="forklift-queue">Queue 0</div>
+                  <div class="history-strip" id="forklift-history"></div>
+                  <div class="mini-controls">
+                    <button class="ghost" data-action="dec-forklifts">-</button>
+                    <button class="ghost" data-action="inc-forklifts">+</button>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div class="zone">
+            <div class="zone util-low" id="yard-zone">
               <div class="zone-header">
-                <strong>Yard layer</strong>
-                <span id="yard-count">0 of 260</span>
+                <div class="zone-title">
+                  <strong>Yard layer</strong>
+                  <span id="yard-count">0 of 260</span>
+                </div>
+                <div class="zone-tools">
+                  <div class="queue-pill" id="yard-queue">Overflow 0</div>
+                  <div class="history-strip" id="yard-history"></div>
+                </div>
               </div>
               <div class="yard-box" id="yard-dots"></div>
             </div>
 
-            <div class="zone">
-              <div class="resource-band">
-                <div class="zone-header" style="margin:0; display:block;">
+            <div class="zone util-low" id="gate-zone">
+              <div class="zone-header">
+                <div class="zone-title">
                   <strong>Gate layer</strong>
-                  <span id="gates-value">0/0</span>
+                  <span id="gates-value">0/0 active</span>
                 </div>
-                <div class="resource-cells" id="gate-cells"></div>
-                <div class="mini-controls">
-                  <button class="ghost" data-action="dec-gates">-</button>
-                  <button class="ghost" data-action="inc-gates">+</button>
+                <div class="zone-tools">
+                  <div class="queue-pill" id="gate-queue">Queue 0</div>
+                  <div class="history-strip" id="gate-history"></div>
+                  <div class="mini-controls">
+                    <button class="ghost" data-action="dec-gates">-</button>
+                    <button class="ghost" data-action="inc-gates">+</button>
+                  </div>
                 </div>
+              </div>
+              <div class="gate-wrap">
+                <div class="gate-lanes" id="gate-lanes"></div>
+                <div class="truck-road" id="truck-road"></div>
               </div>
             </div>
           </div>
@@ -321,13 +652,6 @@
 
         <aside class="panel side">
           <h2>Live Sandbox Rail</h2>
-          <div class="card">
-            <strong>Vessel controls</strong>
-            <div class="control-row">
-              <button class="primary" data-action="add-vessel">+ vessel</button>
-              <button class="ghost" data-action="remove-vessel">- vessel</button>
-            </div>
-          </div>
           <div class="card">
             <strong>Time</strong>
             <div class="speed-row">
@@ -340,19 +664,39 @@
               <button class="ghost" data-action="reset">Reset to empty</button>
             </div>
           </div>
-          <div class="card"><strong>Vessels on scene</strong><span id="vessels-value">0</span></div>
-          <div class="card"><strong>Yard occupancy</strong><span id="yard-value">0 / 260</span></div>
           <div class="card">
-            <strong>Why this candidate</strong>
+            <strong>Current pressure</strong>
+            <div class="stat-grid">
+              <div class="mini-stat">
+                <span>Vessels on scene</span>
+                <strong id="vessels-value">0</strong>
+              </div>
+              <div class="mini-stat">
+                <span>Trucks moving</span>
+                <strong id="trucks-value">0</strong>
+              </div>
+              <div class="mini-stat">
+                <span>Yard load</span>
+                <strong id="yard-value">0 / 260</strong>
+              </div>
+              <div class="mini-stat">
+                <span>Hot layer</span>
+                <strong id="pressure-value">None</strong>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <strong>Behavior changes</strong>
             <p>
-              This keeps the literal flow logic you want, but softens the industrial feel enough that
-              the sandbox could plausibly become a more engaging live simulation product.
+              Vessels now arrive fast, occupy a specific berth, stay still while worked, then leave
+              fast. Trucks do the same at gates, and queue counts now mean demand above available
+              capacity.
             </p>
           </div>
           <div class="back"><a href="./index.html">Back to v2 concepts</a></div>
         </aside>
       </section>
     </main>
-    <script src="./live-ops.js"></script>
+    <script src="./dock-playfield.js"></script>
   </body>
 </html>

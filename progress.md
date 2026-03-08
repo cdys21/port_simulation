@@ -23,3 +23,17 @@ Do you get my point? Try new candidates
   - speed selection updates the selected speed state
   - reset clears vessels, yard, and active flows to zero
 - Headless `page.click(selector)` was flaky on some static `file://` concept buttons even though the DOM handlers are working; direct DOM-triggered clicks confirmed the controls are wired correctly.
+
+- User selected Candidate C for further iteration.
+- Reworked `concepts-v2/dock-playfield.html` and added `concepts-v2/dock-playfield.js` so Candidate C can diverge from the shared mock behavior.
+- Candidate C now has:
+  - inline `+/-` vessel controls in the berth layer like the other resource layers
+  - compact recent-usage charts in berth, crane, forklift, yard, and gate headers
+  - explicit vessel state changes: fast arrival -> fixed berth occupancy -> fast departure
+  - explicit truck state changes at gates: fast approach -> stationary gate service -> fast handoff/departure
+  - queue counts defined as over-capacity pressure, not generic activity
+  - layer tinting based on utilization / pressure
+- Verification:
+  - `node --check concepts-v2/dock-playfield.js`
+  - Playwright screenshot pass for updated Candidate C
+  - direct Playwright state checks for `add-vessel`, `dec-gates`, speed changes, and `reset`

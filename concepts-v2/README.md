@@ -17,6 +17,17 @@ Files:
 - `activity-stack.html`
 - `dock-playfield.html`
 - `live-ops.js`
+- `dock-playfield.js`
+
+Notes:
+
+- `dock-playfield.html` now has its own dedicated behavior file, `dock-playfield.js`.
+- Candidate C models:
+  - vessels arriving fast from the left, holding a berth while worked, then departing fast right
+  - export trucks entering through gates and import trucks leaving through gates
+  - queue pills as over-capacity counts, not generic activity counts
+  - inline recent-usage mini charts for berth, crane, forklift, yard, and gate layers
+  - layer tinting by utilization / pressure
 
 Open them directly in a browser, or run a local server from the repo root:
 
