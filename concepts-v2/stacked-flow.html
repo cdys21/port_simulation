@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Candidate A - Stacked Flow</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #08111a;
+        --panel: rgba(12, 23, 37, 0.84);
+        --panel-strong: rgba(16, 31, 49, 0.92);
+        --line: rgba(164, 190, 216, 0.15);
+        --ink: #eef5fb;
+        --muted: #95aabd;
+        --blue: #69a8ff;
+        --teal: #25c8aa;
+        --amber: #ffb668;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Avenir Next", "Segoe UI", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(37,200,170,0.12), transparent 22%),
+          linear-gradient(180deg, #071018 0%, #04080d 100%);
+      }
+      .shell {
+        width: min(1440px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 18px 0 24px;
+      }
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        gap: 20px;
+        margin-bottom: 16px;
+      }
+      .eyebrow {
+        margin: 0 0 8px;
+        color: var(--amber);
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        font-size: 0.74rem;
+        font-weight: 700;
+      }
+      h1 { margin: 0; font-size: 2.8rem; line-height: 0.94; }
+      .lede { margin: 10px 0 0; color: var(--muted); max-width: 760px; line-height: 1.55; }
+      .layout {
+        display: grid;
+        grid-template-columns: 300px minmax(0, 1fr) 300px;
+        gap: 16px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        box-shadow: 0 22px 58px rgba(0,0,0,0.28);
+        backdrop-filter: blur(18px);
+      }
+      .section { padding: 18px; }
+      .section h2, .section h3 { margin: 0 0 12px; font-size: 1rem; }
+      .control-card {
+        padding: 14px;
+        border-radius: 18px;
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.06);
+        margin-bottom: 12px;
+      }
+      .control-card strong { display: block; margin-bottom: 8px; }
+      .control-row, .speed-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      button {
+        border: 0;
+        border-radius: 14px;
+        padding: 10px 12px;
+        cursor: pointer;
+        font: inherit;
+      }
+      .ghost { background: rgba(255,255,255,0.06); color: var(--ink); }
+      .primary { background: linear-gradient(135deg, #174873, #0f766e); color: white; font-weight: 700; }
+      .speed-row button.selected { background: var(--ink); color: #09111a; }
+      .board { padding: 18px; }
+      .board-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: center;
+        margin-bottom: 14px;
+      }
+      .pillbar { display: flex; gap: 8px; flex-wrap: wrap; }
+      .pill {
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.05);
+        color: var(--muted);
+      }
+      .live-stack {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-height: 760px;
+      }
+      .flow-overlay {
+        position: absolute;
+        inset: 110px 24px 120px 24px;
+        pointer-events: none;
+        overflow: hidden;
+      }
+      .flow-overlay .stream {
+        position: absolute;
+        inset: 0;
+      }
+      .flow-dot {
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        opacity: 0.9;
+      }
+      .flow-dot.import {
+        top: -18px;
+        background: var(--blue);
+        animation: down 3.6s linear infinite;
+      }
+      .flow-dot.export {
+        bottom: -18px;
+        background: var(--amber);
+        animation: up 3.2s linear infinite;
+      }
+      .layer {
+        position: relative;
+        border-radius: 26px;
+        border: 1px solid var(--line);
+        background: var(--panel-strong);
+        padding: 16px;
+      }
+      .layer-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+      .layer-head strong { font-size: 1rem; }
+      .layer-head span { color: var(--muted); }
+      .berth-layer { min-height: 150px; }
+      .berth-slots {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+      .berth-slot {
+        padding: 14px;
+        border-radius: 18px;
+        background: rgba(255,255,255,0.05);
+      }
+      .berth-slot strong { display: block; }
+      .berth-slot span { color: var(--muted); font-size: 0.82rem; }
+      .vessel-track {
+        position: relative;
+        height: 54px;
+        border-radius: 18px;
+        background: rgba(255,255,255,0.03);
+        overflow: hidden;
+      }
+      .vessel {
+        position: absolute;
+        min-width: 92px;
+        padding: 10px 12px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #174873, #0f3b5f);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.22);
+      }
+      .vessel strong { display: block; font-size: 0.86rem; }
+      .vessel span { color: rgba(255,255,255,0.74); font-size: 0.72rem; }
+      .resource-cells {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
+        gap: 8px;
+      }
+      .resource-cell {
+        padding: 10px 0;
+        border-radius: 14px;
+        text-align: center;
+        font-weight: 700;
+      }
+      .resource-cell.active { background: rgba(37,200,170,0.18); color: var(--teal); }
+      .resource-cell.idle { background: rgba(255,255,255,0.04); color: var(--muted); }
+      .yard-box {
+        min-height: 170px;
+        border-radius: 22px;
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.06);
+        padding: 14px;
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .yard-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--teal), var(--blue));
+      }
+      .telemetry-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .stat {
+        padding: 14px;
+        border-radius: 18px;
+        background: rgba(255,255,255,0.04);
+      }
+      .stat span { display: block; color: var(--muted); font-size: 0.8rem; }
+      .stat strong { display: block; margin-top: 6px; font-size: 1.5rem; }
+      .back { margin-top: 14px; }
+      .back a { color: var(--muted); text-decoration: none; }
+      @keyframes down { to { transform: translateY(100%); } }
+      @keyframes up { to { transform: translateY(-100%); } }
+      @media (max-width: 1180px) {
+        .layout { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body data-concept="Stacked Flow">
+    <main class="shell" data-live-ops>
+      <header class="header">
+        <div>
+          <p class="eyebrow">Candidate A</p>
+          <h1>Stacked Flow</h1>
+          <p class="lede">
+            The cleanest version of your model. Layers are explicit, imports visually fall, exports
+            rise, and the controls sit outside the flow so the movement stays easy to read.
+          </p>
+        </div>
+        <div class="pillbar">
+          <div class="pill">Imports down</div>
+          <div class="pill">Exports up</div>
+          <div class="pill">Continuous live ops</div>
+        </div>
+      </header>
+
+      <section class="layout">
+        <aside class="panel section">
+          <h2>Sandbox Controls</h2>
+          <div class="control-card">
+            <strong>Vessels</strong>
+            <div class="control-row">
+              <button class="primary" data-action="add-vessel">+ vessel</button>
+              <button class="ghost" data-action="remove-vessel">- vessel</button>
+            </div>
+          </div>
+          <div class="control-card">
+            <strong>Cranes</strong>
+            <div class="control-row">
+              <button class="ghost" data-action="dec-cranes">-</button>
+              <button class="ghost" data-action="inc-cranes">+</button>
+            </div>
+          </div>
+          <div class="control-card">
+            <strong>Forklifts</strong>
+            <div class="control-row">
+              <button class="ghost" data-action="dec-forklifts">-</button>
+              <button class="ghost" data-action="inc-forklifts">+</button>
+            </div>
+          </div>
+          <div class="control-card">
+            <strong>Gates</strong>
+            <div class="control-row">
+              <button class="ghost" data-action="dec-gates">-</button>
+              <button class="ghost" data-action="inc-gates">+</button>
+            </div>
+          </div>
+          <div class="control-card">
+            <strong>Time</strong>
+            <div class="speed-row">
+              <button class="ghost" data-speed="1">1x</button>
+              <button class="ghost" data-speed="4">4x</button>
+              <button class="ghost selected" data-speed="8">8x</button>
+              <button class="ghost" data-speed="16">16x</button>
+            </div>
+            <div class="control-row" style="margin-top: 10px;">
+              <button class="ghost" data-action="reset">Reset to empty</button>
+            </div>
+          </div>
+        </aside>
+
+        <div class="panel board">
+          <div class="board-top">
+            <div>
+              <p class="eyebrow" style="margin-bottom:6px;">Live Ops</p>
+              <strong id="clock" style="font-size:1.6rem;">D0 00:00</strong>
+            </div>
+            <div class="pillbar">
+              <div class="pill">Speed <strong id="speed-value">8x</strong></div>
+              <div class="pill">Imports <strong id="import-value">0 active lanes down</strong></div>
+              <div class="pill">Exports <strong id="export-value">0 active lanes up</strong></div>
+            </div>
+          </div>
+
+          <div class="live-stack">
+            <div class="flow-overlay">
+              <div class="stream" id="import-stream"></div>
+              <div class="stream" id="export-stream"></div>
+            </div>
+
+            <div class="layer berth-layer">
+              <div class="layer-head">
+                <strong>Berth spaces</strong>
+                <span>vessels enter left, leave right</span>
+              </div>
+              <div class="berth-slots" id="berth-slots"></div>
+              <div class="vessel-track" id="vessel-track"></div>
+            </div>
+
+            <div class="layer">
+              <div class="layer-head">
+                <strong>Crane layer</strong>
+                <span id="cranes-value">0/0</span>
+              </div>
+              <div class="resource-cells" id="crane-cells"></div>
+            </div>
+
+            <div class="layer">
+              <div class="layer-head">
+                <strong>Forklift layer</strong>
+                <span id="forklifts-value">0/0</span>
+              </div>
+              <div class="resource-cells" id="forklift-cells"></div>
+            </div>
+
+            <div class="layer">
+              <div class="layer-head">
+                <strong>Yard layer</strong>
+                <span id="yard-count">0 of 260</span>
+              </div>
+              <div class="yard-box" id="yard-dots"></div>
+            </div>
+
+            <div class="layer">
+              <div class="layer-head">
+                <strong>Gate layer</strong>
+                <span id="gates-value">0/0</span>
+              </div>
+              <div class="resource-cells" id="gate-cells"></div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="panel section">
+          <h2>Live Readout</h2>
+          <div class="telemetry-grid">
+            <div class="stat"><span>Vessels on scene</span><strong id="vessels-value">0</strong></div>
+            <div class="stat"><span>Yard capacity</span><strong id="yard-value">0 / 260</strong></div>
+            <div class="stat"><span>Blue dots</span><strong>Import down</strong></div>
+            <div class="stat"><span>Amber dots</span><strong>Export up</strong></div>
+          </div>
+          <div class="control-card" style="margin-top: 14px;">
+            <strong>Why this candidate</strong>
+            <p style="margin:0; color:var(--muted); line-height:1.5;">
+              Strongest directional clarity. If you want the sandbox to teach the terminal as a
+              layered system, this is the cleanest starting point.
+            </p>
+          </div>
+          <div class="back"><a href="./index.html">Back to v2 concepts</a></div>
+        </aside>
+      </section>
+    </main>
+    <script src="./live-ops.js"></script>
+  </body>
+</html>
