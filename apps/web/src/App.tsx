@@ -8,9 +8,10 @@ import {
   fetchScenarios,
   saveScenario,
 } from "./api";
+import PlaybackTab from "./PlaybackTab";
 import { RunRecord, ScenarioConfig, ScenarioRecord } from "./types";
 
-type TabKey = "overview" | "yard" | "vessels" | "containers";
+type TabKey = "overview" | "playback" | "yard" | "vessels" | "containers";
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -717,7 +718,7 @@ export default function App() {
         <main className="content">
           <div className="content-toolbar">
             <div className="tab-strip">
-              {(["overview", "yard", "vessels", "containers"] as TabKey[]).map((tab) => (
+              {(["overview", "playback", "yard", "vessels", "containers"] as TabKey[]).map((tab) => (
                 <button
                   key={tab}
                   className={`tab-button ${activeTab === tab ? "active" : ""}`}
@@ -899,6 +900,8 @@ export default function App() {
               </div>
             </>
           )}
+
+          {result && activeTab === "playback" && <PlaybackTab key={activeRun?.id} result={result} />}
 
           {result && activeTab === "yard" && (
             <div className="chart-grid">

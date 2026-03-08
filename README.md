@@ -55,6 +55,7 @@ The Vite dev server proxies `/api` to `http://127.0.0.1:8000`.
 
 - [Architecture](docs/architecture.md)
 - [Simulation Model](docs/simulation-model.md)
+- [Playback Decisions](docs/playback-decisions.md)
 - [Development](docs/development.md)
 
 ## Current Scope

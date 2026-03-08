@@ -104,13 +104,25 @@ class SimulationEngine:
         self.active_yard: List[Task] = []
         self.active_rail: List[Task] = []
         self.next_import_train_departure_min = self._train_interval_minutes()
+        self.snapshot_interval_minutes = 15
         self.timeseries: List[dict] = []
+        self.playback_snapshots: List[dict] = []
+        self.events: List[dict] = []
         self.event_counts = {
             "import_completed": 0,
             "export_loaded": 0,
             "export_rolled": 0,
         }
+        self._gate_was_open = self._is_gate_open(0)
+        self._yard_congested = False
+        self._gate_congested = False
         self._build_entities()
+        self._log_event(
+            kind="scenario_start",
+            label="Scenario seeded with warm-start inventory and vessel schedule.",
+            zone="terminal",
+            severity="info",
+        )
 
     def _sample_value(self, tri) -> float:
         return self.random.triangular(tri.minimum, tri.maximum, tri.mode)
@@ -161,6 +173,224 @@ class SimulationEngine:
             0.0, fill - self.config.yard_policy.congestion_threshold
         ) ** 2
         return max(1, int(round((base + penalty) * multiplier)))
+
+    def _log_event(
+        self,
+        kind: str,
+        label: str,
+        zone: str,
+        severity: str = "info",
+        entity_type: Optional[str] = None,
+        entity_id: Optional[str] = None,
+        count: Optional[int] = None,
+    ) -> None:
+        self.events.append(
+            {
+                "minute": self.current_minute,
+                "hour": round(self.current_minute / 60, 2),
+                "kind": kind,
+                "label": label,
+                "zone": zone,
+                "severity": severity,
+                "entity_type": entity_type,
+                "entity_id": entity_id,
+                "count": count,
+            }
+        )
+
+    def _mark_export_rolled(self, container: Container, reason: str, zone: str) -> None:
+        if container.status == "rolled":
+            return
+        container.status = "rolled"
+        self.event_counts["export_rolled"] += 1
+        self._log_event(
+            kind="export_rolled",
+            label=f"Export {container.id} rolled after {reason}.",
+            zone=zone,
+            severity="warning",
+            entity_type="container",
+            entity_id=container.id,
+        )
+
+    def _yard_counts(self) -> tuple[int, int, int]:
+        total_yard = sum(block.occupancy_units for block in self.blocks.values())
+        import_yard = sum(
+            1
+            for container in self.containers.values()
+            if container.direction == "import"
+            and container.status
+            in {
+                "in_yard_hold",
+                "pickup_eligible",
+                "queued_retrieval",
+                "retrieving",
+                "queued_import_putaway",
+                "putting_away",
+            }
+        )
+        export_yard = sum(
+            1
+            for container in self.containers.values()
+            if container.direction == "export"
+            and container.status
+            in {"in_yard_export", "queued_prestage", "prestaging", "queued_export_putaway", "putting_away", "rolled"}
+        )
+        return total_yard, import_yard, export_yard
+
+    def _queue_counts(self) -> dict:
+        return {
+            "berth_queue": len(self.berth_waiting),
+            "gate_queue": len(
+                [cid for cid in self.gate_queue if self.containers[cid].status.startswith("waiting_gate")]
+            ),
+            "rail_queue": len(self.import_rail_ready) + len(self.rail_receive_queue),
+            "yard_queue": len(self.yard_queue),
+        }
+
+    def _flow_counts(self) -> dict:
+        return {
+            "vessel_to_yard": len([task for task in self.active_sts if task.kind == "discharge_move"]),
+            "quay_to_vessel": len([task for task in self.active_sts if task.kind == "load_move"]),
+            "gate_to_yard": len([task for task in self.active_gate if task.kind == "export_gate_receive"]),
+            "yard_to_gate": len([task for task in self.active_gate if task.kind == "import_gate_exit"]),
+            "rail_to_yard": len([task for task in self.active_rail if task.kind == "export_rail_receive"]),
+            "yard_to_rail": sum(
+                len(task.container_ids) for task in self.active_rail if task.kind == "import_train_batch"
+            ),
+            "yard_to_quay": len([task for task in self.active_yard if task.kind == "export_prestage"]),
+            "yard_retrieval": len([task for task in self.active_yard if task.kind == "import_retrieve"]),
+        }
+
+    def _vessel_zone(self, vessel: VesselState) -> str:
+        if vessel.status == "scheduled":
+            return "scheduled"
+        if vessel.status == "waiting_berth":
+            return "anchorage"
+        if vessel.status == "berthed" and vessel.berth_slot is not None:
+            return f"berth-{vessel.berth_slot + 1}"
+        if vessel.status == "departed":
+            return "departed"
+        return "terminal"
+
+    def _record_playback_snapshot(self) -> None:
+        total_yard, import_yard, export_yard = self._yard_counts()
+        queues = self._queue_counts()
+        total_capacity = sum(block.capacity_teu for block in self.blocks.values()) or 1
+        self.playback_snapshots.append(
+            {
+                "minute": self.current_minute,
+                "hour": round(self.current_minute / 60, 2),
+                "gate_open": self._is_gate_open(self.current_minute),
+                "yard": {
+                    "total_units": total_yard,
+                    "import_units": import_yard,
+                    "export_units": export_yard,
+                    "fill_rate": round(total_yard / total_capacity, 3),
+                },
+                "queues": queues,
+                "resources": {
+                    "berths_in_use": sum(1 for slot in self.berth_slots if slot is not None),
+                    "berths_capacity": self.config.resources.berths,
+                    "berth_utilization": round(
+                        sum(1 for slot in self.berth_slots if slot is not None) / self.config.resources.berths,
+                        3,
+                    ),
+                    "sts_utilization": round(len(self.active_sts) / self.config.resources.sts_cranes, 3),
+                    "gate_utilization": round(len(self.active_gate) / self.config.resources.gate_lanes, 3),
+                    "yard_utilization": round(len(self.active_yard) / self.config.resources.yard_equipment, 3),
+                    "rail_utilization": round(len(self.active_rail) / self.config.resources.rail_slots, 3),
+                },
+                "flows": self._flow_counts(),
+                "counters": {
+                    "import_completed": self.event_counts["import_completed"],
+                    "export_loaded": self.event_counts["export_loaded"],
+                    "export_rolled": self.event_counts["export_rolled"],
+                },
+                "blocks": [
+                    {
+                        "id": block.id,
+                        "label": block.label,
+                        "occupancy": block.occupancy_units,
+                        "capacity": block.capacity_teu,
+                        "fill_rate": round(self._block_fill_rate(block.id), 3),
+                    }
+                    for block in self.blocks.values()
+                ],
+                "vessels": [
+                    {
+                        "id": vessel.id,
+                        "name": vessel.name,
+                        "zone": self._vessel_zone(vessel),
+                        "status": vessel.status,
+                        "phase": vessel.phase,
+                        "remaining_imports": sum(
+                            1
+                            for cid in vessel.import_container_ids
+                            if self.containers[cid].status not in {"exited", "yard_overflow"}
+                        ),
+                        "remaining_exports": sum(
+                            1
+                            for cid in vessel.export_container_ids
+                            if self.containers[cid].status not in {"loaded", "rolled"}
+                        ),
+                        "quay_ready_exports": sum(
+                            1 for cid in vessel.export_container_ids if self.containers[cid].status == "quay_ready"
+                        ),
+                    }
+                    for vessel in self.vessels.values()
+                ],
+            }
+        )
+
+    def _emit_operational_alerts(self) -> None:
+        gate_open = self._is_gate_open(self.current_minute)
+        if gate_open != self._gate_was_open:
+            self._log_event(
+                kind="gate_window",
+                label=f"Gate {'opened' if gate_open else 'closed'} for truck operations.",
+                zone="gate",
+                severity="info",
+            )
+            self._gate_was_open = gate_open
+
+        total_yard, _, _ = self._yard_counts()
+        total_capacity = sum(block.capacity_teu for block in self.blocks.values()) or 1
+        fill_rate = total_yard / total_capacity
+        yard_congested = fill_rate >= self.config.yard_policy.congestion_threshold
+        if yard_congested and not self._yard_congested:
+            self._log_event(
+                kind="yard_congested",
+                label=f"Yard fill crossed congestion threshold at {round(fill_rate * 100, 1)}%.",
+                zone="yard",
+                severity="warning",
+            )
+        if not yard_congested and self._yard_congested:
+            self._log_event(
+                kind="yard_recovered",
+                label="Yard fill dropped back below the congestion threshold.",
+                zone="yard",
+                severity="info",
+            )
+        self._yard_congested = yard_congested
+
+        gate_queue = self._queue_counts()["gate_queue"]
+        gate_congested = gate_queue >= self.config.resources.gate_lanes * 3
+        if gate_congested and not self._gate_congested:
+            self._log_event(
+                kind="gate_queue_spike",
+                label=f"Gate queue spiked to {gate_queue} trucks waiting.",
+                zone="gate",
+                severity="warning",
+                count=gate_queue,
+            )
+        if not gate_congested and self._gate_congested:
+            self._log_event(
+                kind="gate_queue_relieved",
+                label="Gate queue dropped back to normal range.",
+                zone="gate",
+                severity="info",
+            )
+        self._gate_congested = gate_congested
 
     def _build_entities(self) -> None:
         export_by_type: Dict[str, List[str]] = {ct.id: [] for ct in self.config.container_types}
@@ -287,13 +517,20 @@ class SimulationEngine:
         if vessel.phase == "discharge" and not self._has_pending_import_work(vessel):
             vessel.phase = "switch_over"
             vessel.switch_over_end_min = self.current_minute + vessel.switch_over_minutes
+            self._log_event(
+                kind="vessel_switch_over",
+                label=f"{vessel.name} finished discharge and entered switch-over.",
+                zone="quay",
+                severity="info",
+                entity_type="vessel",
+                entity_id=vessel.id,
+            )
 
     def _handle_gate_completion(self, task: Task) -> None:
         container = self.containers[task.container_ids[0]]
         if task.kind == "export_gate_receive":
             if container.load_cutoff_min and self.current_minute >= container.load_cutoff_min:
-                container.status = "rolled"
-                self.event_counts["export_rolled"] += 1
+                self._mark_export_rolled(container, "missing the vessel load cutoff", "gate")
                 return
             container.timestamps["gate_in_complete"] = self.current_minute
             container.status = "queued_export_putaway"
@@ -344,8 +581,7 @@ class SimulationEngine:
         if task.kind == "export_rail_receive":
             container = self.containers[task.container_ids[0]]
             if container.load_cutoff_min and self.current_minute >= container.load_cutoff_min:
-                container.status = "rolled"
-                self.event_counts["export_rolled"] += 1
+                self._mark_export_rolled(container, "missing the vessel load cutoff", "rail")
                 return
             container.timestamps["rail_receive_complete"] = self.current_minute
             container.status = "queued_export_putaway"
@@ -374,12 +610,19 @@ class SimulationEngine:
             if vessel.status == "scheduled" and vessel.actual_arrival_min <= self.current_minute:
                 vessel.status = "waiting_berth"
                 self.berth_waiting.append(vessel.id)
+                self._log_event(
+                    kind="vessel_arrived",
+                    label=f"{vessel.name} arrived and entered the berth queue.",
+                    zone="anchorage",
+                    severity="info",
+                    entity_type="vessel",
+                    entity_id=vessel.id,
+                )
         for container in self.containers.values():
             if container.direction == "export" and container.status == "awaiting_arrival":
                 if container.export_arrival_min is not None and container.export_arrival_min <= self.current_minute:
                     if container.gate_cutoff_min is not None and self.current_minute > container.gate_cutoff_min:
-                        container.status = "rolled"
-                        self.event_counts["export_rolled"] += 1
+                        self._mark_export_rolled(container, "arriving after terminal cutoff", "gate")
                     elif container.mode == "truck":
                         container.status = "waiting_gate_in"
                         self.gate_queue.append(container.id)
@@ -402,6 +645,14 @@ class SimulationEngine:
                 vessel.timestamps = getattr(vessel, "timestamps", {})
                 vessel.berth_slot = slot_index
                 self.berth_slots[slot_index] = next_vessel_id
+                self._log_event(
+                    kind="vessel_berthed",
+                    label=f"{vessel.name} secured berth {slot_index + 1}.",
+                    zone="quay",
+                    severity="info",
+                    entity_type="vessel",
+                    entity_id=vessel.id,
+                )
 
     def _advance_vessel_phases(self) -> None:
         for vessel in self.vessels.values():
@@ -410,19 +661,34 @@ class SimulationEngine:
             if vessel.phase == "switch_over" and vessel.switch_over_end_min is not None:
                 if self.current_minute >= vessel.switch_over_end_min:
                     vessel.phase = "load"
+                    self._log_event(
+                        kind="load_window_open",
+                        label=f"{vessel.name} started export loading.",
+                        zone="quay",
+                        severity="info",
+                        entity_type="vessel",
+                        entity_id=vessel.id,
+                    )
             if vessel.phase == "load":
                 for container_id in vessel.export_container_ids:
                     container = self.containers[container_id]
                     if container.status not in {"loaded", "loading", "rolled"}:
                         if vessel.load_cutoff_min <= self.current_minute:
-                            container.status = "rolled"
-                            self.event_counts["export_rolled"] += 1
+                            self._mark_export_rolled(container, "the vessel load window closing", "quay")
                 if not self._has_pending_export_work(vessel):
                     vessel.status = "departed"
                     vessel.departure_min = self.current_minute
                     if vessel.berth_slot is not None:
                         self.berth_slots[vessel.berth_slot] = None
                         vessel.berth_slot = None
+                    self._log_event(
+                        kind="vessel_departed",
+                        label=f"{vessel.name} completed work and departed the terminal.",
+                        zone="quay",
+                        severity="info",
+                        entity_type="vessel",
+                        entity_id=vessel.id,
+                    )
 
     def _enqueue_yard_work(self) -> None:
         for container in self.containers.values():
@@ -619,33 +885,28 @@ class SimulationEngine:
                     )
                 )
                 free_slots -= 1
+                self._log_event(
+                    kind="import_train_departed",
+                    label=f"Import train departed with {len(batch)} containers.",
+                    zone="rail",
+                    severity="info",
+                    count=len(batch),
+                )
             self.next_import_train_departure_min += self._train_interval_minutes()
 
     def _record_metrics(self) -> None:
-        total_yard = sum(block.occupancy_units for block in self.blocks.values())
-        import_yard = sum(
-            1
-            for c in self.containers.values()
-            if c.direction == "import"
-            and c.status
-            in {"in_yard_hold", "pickup_eligible", "queued_retrieval", "retrieving", "queued_import_putaway", "putting_away"}
-        )
-        export_yard = sum(
-            1
-            for c in self.containers.values()
-            if c.direction == "export"
-            and c.status in {"in_yard_export", "queued_prestage", "prestaging", "queued_export_putaway", "putting_away", "rolled"}
-        )
+        total_yard, import_yard, export_yard = self._yard_counts()
+        queues = self._queue_counts()
         self.timeseries.append(
             {
                 "hour": round(self.current_minute / 60, 2),
                 "total_yard_units": total_yard,
                 "import_yard_units": import_yard,
                 "export_yard_units": export_yard,
-                "berth_queue": len(self.berth_waiting),
-                "gate_queue": len([cid for cid in self.gate_queue if self.containers[cid].status.startswith("waiting_gate")]),
-                "rail_queue": len(self.import_rail_ready) + len(self.rail_receive_queue),
-                "yard_queue": len(self.yard_queue),
+                "berth_queue": queues["berth_queue"],
+                "gate_queue": queues["gate_queue"],
+                "rail_queue": queues["rail_queue"],
+                "yard_queue": queues["yard_queue"],
                 "sts_utilization": round(len(self.active_sts) / self.config.resources.sts_cranes, 3),
                 "gate_utilization": round(len(self.active_gate) / self.config.resources.gate_lanes, 3),
                 "yard_utilization": round(len(self.active_yard) / self.config.resources.yard_equipment, 3),
@@ -672,12 +933,17 @@ class SimulationEngine:
             self._start_yard_tasks()
             self._start_gate_tasks()
             self._start_rail_tasks()
+            self._emit_operational_alerts()
+            if minute % self.snapshot_interval_minutes == 0:
+                self._record_playback_snapshot()
             if minute % 60 == 0:
                 self._record_metrics()
                 if progress_callback and self.max_minutes:
                     progress_callback(min(1.0, minute / self.max_minutes))
             if self._clear_after_horizon():
                 break
+        if not self.playback_snapshots or self.playback_snapshots[-1]["minute"] != self.current_minute:
+            self._record_playback_snapshot()
         return self._build_result()
 
     def _build_result(self) -> dict:
@@ -758,4 +1024,10 @@ class SimulationEngine:
             "timeseries": self.timeseries,
             "containers": container_rows,
             "vessels": vessel_rows,
+            "playback": {
+                "snapshot_interval_minutes": self.snapshot_interval_minutes,
+                "duration_hours": round(self.current_minute / 60, 2),
+                "snapshots": self.playback_snapshots,
+                "events": self.events,
+            },
         }

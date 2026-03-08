@@ -4,8 +4,11 @@ import json
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
+from time import sleep
 from typing import List
 from uuid import uuid4
+
+from pydantic import ValidationError
 
 from .defaults import DEFAULT_SCENARIO
 from .schemas import RunRecord, ScenarioConfig, ScenarioRecord
@@ -18,7 +21,22 @@ RUN_DIR = DATA_DIR / "runs"
 
 
 def _write_json(path: Path, payload: dict) -> None:
-    path.write_text(json.dumps(payload, indent=2))
+    temp_path = path.with_name(f"{path.stem}.{uuid4().hex}.tmp")
+    temp_path.write_text(json.dumps(payload, indent=2))
+    temp_path.replace(path)
+
+
+def _read_model(path: Path, model_cls):
+    last_error: Exception | None = None
+    for _ in range(3):
+        try:
+            return model_cls.model_validate_json(path.read_text())
+        except ValidationError as exc:
+            last_error = exc
+            sleep(0.05)
+    if last_error is not None:
+        raise last_error
+    raise FileNotFoundError(f"{path.name} could not be read")
 
 
 def ensure_storage() -> None:
@@ -45,7 +63,7 @@ def list_scenarios() -> List[ScenarioRecord]:
     ensure_storage()
     scenarios = []
     for path in sorted(SCENARIO_DIR.glob("*.json")):
-        scenarios.append(ScenarioRecord.model_validate_json(path.read_text()))
+        scenarios.append(_read_model(path, ScenarioRecord))
     return scenarios
 
 
@@ -53,14 +71,17 @@ def get_scenario(scenario_id: str) -> ScenarioRecord:
     path = SCENARIO_DIR / f"{scenario_id}.json"
     if not path.exists():
         raise FileNotFoundError(f"Scenario {scenario_id} does not exist")
-    return ScenarioRecord.model_validate_json(path.read_text())
+    return _read_model(path, ScenarioRecord)
 
 
 def list_runs() -> List[RunRecord]:
     ensure_storage()
     runs = []
     for path in sorted(RUN_DIR.glob("*.json")):
-        runs.append(RunRecord.model_validate_json(path.read_text()))
+        try:
+            runs.append(_read_model(path, RunRecord))
+        except ValidationError:
+            continue
     runs.sort(key=lambda run: run.created_at, reverse=True)
     return runs
 
@@ -112,7 +133,7 @@ def get_run(run_id: str) -> RunRecord:
     path = RUN_DIR / f"{run_id}.json"
     if not path.exists():
         raise FileNotFoundError(f"Run {run_id} does not exist")
-    return RunRecord.model_validate_json(path.read_text())
+    return _read_model(path, RunRecord)
 
 
 def save_run(run: RunRecord) -> RunRecord:
